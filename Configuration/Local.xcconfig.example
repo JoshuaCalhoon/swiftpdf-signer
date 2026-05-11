@@ -1,0 +1,10 @@
+// Configuration/Local.xcconfig.example
+//
+// Copy this file to Configuration/Local.xcconfig (the real one is gitignored)
+// and replace the placeholder with your actual Dropbox App Key from
+// https://www.dropbox.com/developers/apps.
+//
+// The App Key is a public OAuth client identifier — not a cryptographic secret.
+// PKCE prevents impersonation. Still gitignored as a defense-in-depth habit.
+
+DROPBOX_APP_KEY = REPLACE_WITH_DROPBOX_APP_KEY
