@@ -9,11 +9,20 @@ struct FormView: View {
     @State private var signature = PKDrawing()
     @State private var isUploading = false
     @State private var status: Status = .idle
+    @State private var pendingUpload: PendingUpload?
+    @State private var showDisconnectConfirm = false
 
     enum Status: Equatable {
         case idle
         case success(path: String)
         case failure(message: String)
+    }
+
+    /// Rendered PDF cached between attempts so a Retry doesn't re-render
+    /// or shift the signed-at date if the user pauses between tries.
+    struct PendingUpload {
+        let data: Data
+        let filename: String
     }
 
     var body: some View {
@@ -24,6 +33,34 @@ struct FormView: View {
         }
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) {
+                        showDisconnectConfirm = true
+                    } label: {
+                        Label("Disconnect Dropbox", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .accessibilityLabel("More options")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Disconnect from Dropbox?",
+            isPresented: $showDisconnectConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Disconnect", role: .destructive) {
+                dropbox.unauthorize()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You'll need to reconnect on this iPad before you can upload signed forms again.")
+        }
+        .onChange(of: printName) { _, _ in invalidateAfterEdit() }
+        .onChange(of: signature) { _, _ in invalidateAfterEdit() }
     }
 
     private var preview: some View {
@@ -67,6 +104,9 @@ struct FormView: View {
                 Group {
                     if isUploading {
                         ProgressView().controlSize(.regular)
+                    } else if pendingUpload != nil {
+                        Text("Retry Upload")
+                            .frame(maxWidth: .infinity)
                     } else {
                         Text("Done — Save & Upload")
                             .frame(maxWidth: .infinity)
@@ -110,21 +150,44 @@ struct FormView: View {
         isUploading = true
         defer { isUploading = false }
 
-        let renderer = FormRenderer()
-        let pdfData = renderer.render(
-            template: template,
-            printName: printName,
-            signature: signature,
-            signedAt: Date()
-        )
-        let filename = makeFilename(for: printName, on: Date())
+        let upload: PendingUpload
+        if let existing = pendingUpload {
+            upload = existing
+        } else {
+            let renderer = FormRenderer()
+            let now = Date()
+            let pdfData = renderer.render(
+                template: template,
+                printName: printName,
+                signature: signature,
+                signedAt: now
+            )
+            upload = PendingUpload(
+                data: pdfData,
+                filename: makeFilename(for: printName, on: now)
+            )
+            pendingUpload = upload
+        }
+
         do {
-            let path = try await dropbox.upload(pdfData, filename: filename)
+            let path = try await dropbox.upload(upload.data, filename: upload.filename)
             status = .success(path: path)
+            pendingUpload = nil
             printName = ""
             signature = PKDrawing()
         } catch {
             status = .failure(message: error.localizedDescription)
+        }
+    }
+
+    /// Drops the cached PDF + clears any retry banner whenever the inputs change,
+    /// so a fresh edit always renders fresh. Leaves a `.success` banner alone —
+    /// SwiftUI batches the post-submit `printName`/`signature` resets, and clearing
+    /// success here would knock the banner out before it ever displays.
+    private func invalidateAfterEdit() {
+        pendingUpload = nil
+        if case .failure = status {
+            status = .idle
         }
     }
 

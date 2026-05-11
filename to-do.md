@@ -3,7 +3,7 @@
 - [ ] **User: do one real signed upload** — type a Print Name, sign, tap Done. Verify a file with name `General Safety Rules - {YourName} [{YYYY-MM-DD}].pdf` lands in your Dropbox under `/Apps/SwiftPDF/Signed/`.
 
 ## Next
-- [ ] Polish based on what we see end-to-end (probably: success transition, error retry handling, possibly an "Unauthorize" action in a settings nook)
+- [ ] Real-world polish after end-to-end testing: success banner auto-dismiss (design.md spec says 2s on success), keyboard avoidance behind the signature canvas, possibly a "Sign Another" interstitial after success
 - [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)
@@ -27,3 +27,5 @@
 - [x] Add first-launch Dropbox auth gate (`ConnectDropboxView`), gated by `dropbox.authState` in `ContentView`
 - [x] Bump signature canvas to 200pt — fits Pencil/finger signing comfortably
 - [x] Confirmed Connect Dropbox screen renders on the simulator
+- [x] FormRenderer fix: use `UIGraphicsPDFRendererContext.beginPage()` (replace the `UIGraphicsGetCurrentContext()?.beginPDFPage(nil)` path)
+- [x] Error-paths polish pass: cache rendered PDF + Retry button on failure; ellipsis-menu Disconnect Dropbox with confirmation; auth failures during upload (token revoked / refresh fail) clear local auth so ContentView routes back to ConnectDropboxView

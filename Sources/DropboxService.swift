@@ -62,15 +62,31 @@ final class DropboxService {
     }
 
     /// Uploads the signed PDF; returns the canonical Dropbox path.
+    /// Token-revoked / refresh-failure errors are surfaced as `ServiceError.notAuthorized`
+    /// after clearing the local client — `ContentView` will then route back to `ConnectDropboxView`.
     func upload(_ pdfData: Data, filename: String) async throws -> String {
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
         let path = "\(DropboxConfig.uploadFolder)/\(filename)"
-        let result = try await client.files
-            .upload(path: path, mode: .add, autorename: true, input: pdfData)
-            .response()
-        return result.pathDisplay ?? path
+        do {
+            let result = try await client.files
+                .upload(path: path, mode: .add, autorename: true, input: pdfData)
+                .response()
+            return result.pathDisplay ?? path
+        } catch let error as CallError<Files.UploadError> {
+            if Self.isAuthFailure(error) {
+                unauthorize()
+                throw ServiceError.notAuthorized
+            }
+            throw error
+        }
+    }
+
+    private static func isAuthFailure(_ error: CallError<Files.UploadError>) -> Bool {
+        if case .authError = error { return true }
+        if case .clientError(let inner) = error, case .oauthError = inner { return true }
+        return false
     }
 
     enum ServiceError: LocalizedError {
