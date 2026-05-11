@@ -4,8 +4,8 @@ _(none — end-to-end pipeline validated)_
 ## Next
 - [ ] **Validate template creation end-to-end**: create a new template via the Library screen, sign it, verify the signed PDF lands in `/Apps/SwiftPDF/Signed/` with the right name; verify the template's JSON shows up in `/Apps/SwiftPDF/Templates/`; verify edit + delete work; verify Library refreshes on pull-down.
 - [ ] Keyboard avoidance behind the signature canvas if it comes up during real-world testing
-- [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
-- [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
+- [ ] **Install on the real iPad** (blocked on Apple Developer Program approval): once approved, fill `DEVELOPMENT_TEAM` in `Configuration/Local.xcconfig`, run `xcodegen generate`, plug iPad in via USB-C, enable Developer Mode on the iPad, run from Xcode. Wireless after first install via Window → Devices & Simulators → "Connect via Network".
+- [ ] (Optional, while waiting) Smoke-test device install via Xcode's free Personal Team — 7-day cert, fine for one-off confirmation that signing/install works before the paid cert lands.
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)
 
@@ -33,3 +33,4 @@ _(none — end-to-end pipeline validated)_
 - [x] **End-to-end pipeline validated** (2026-05-11): OAuth round-trip works in the simulator, one real signed upload landed in `/Apps/SwiftPDF/Signed/` with the correct filename, ellipsis menu Disconnect button verified visible
 - [x] Success interstitial: bottom panel swaps to "Signed and Saved" + "Sign Another" CTA after upload (supersedes prior auto-dismiss banner + auto-clear behavior); see design.md decision log
 - [x] **In-app template creation** (2026-05-11): Library screen replaces hardcoded route; `FormContent` enum splits structured (bundled General Safety) from freeform (user-authored); TemplateEditorView for create/edit; swipe-to-edit/delete on user templates; templates sync via Dropbox `/Apps/SwiftPDF/Templates/` as `{uuid}.json` files; Disconnect Dropbox moves to the Library toolbar.
+- [x] **Pre-stage device-install signing** (2026-05-11): `DEVELOPMENT_TEAM` removed from `project.yml` (was hardcoded empty, shadowing xcconfig); `CODE_SIGN_STYLE: Automatic` set at project level; `Configuration/Local.xcconfig` extended with a `DEVELOPMENT_TEAM =` slot; `.example` updated with documentation. Once Apple Developer Program is approved, the install path is: fill team ID → `xcodegen generate` → run from Xcode.
