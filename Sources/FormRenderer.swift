@@ -34,8 +34,8 @@ struct FormRenderer {
             format: format
         )
 
-        return renderer.pdfData { _ in
-            UIGraphicsGetCurrentContext()?.beginPDFPage(nil)
+        return renderer.pdfData { context in
+            context.beginPage()
             var y = Self.margin
             y = drawTitle(template.name, at: y)
             y = drawHeader(template.header, at: y)
