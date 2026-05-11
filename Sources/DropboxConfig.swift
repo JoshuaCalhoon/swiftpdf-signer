@@ -30,6 +30,12 @@ enum DropboxConfig {
     /// With App-folder scope, "/Signed" maps to "/Apps/SwiftPDF/Signed" in the user's Dropbox.
     static let uploadFolder = "/Signed"
 
+    /// Templates path relative to the app folder.
+    /// "/Templates" maps to "/Apps/SwiftPDF/Templates" in the user's Dropbox.
+    static let templatesFolder = "/Templates"
+
     /// OAuth scopes required: read+write within the app folder.
+    /// `files.content.read` implies `files.metadata.read` per Dropbox's scope model,
+    /// so `list_folder` and `delete_v2` work without an additional explicit grant.
     static let scopes = ["files.content.write", "files.content.read"]
 }

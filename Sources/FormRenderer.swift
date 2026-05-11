@@ -39,9 +39,14 @@ struct FormRenderer {
             var y = Self.margin
             y = drawTitle(template.name, at: y)
             y = drawHeader(template.header, at: y)
-            y = drawIntro(template.intro, at: y)
-            y = drawRules(template.rules, at: y)
-            y = drawAcknowledgment(template.acknowledgment, at: y)
+            switch template.content {
+            case .structured(let intro, let rules, let acknowledgment):
+                y = drawIntro(intro, at: y)
+                y = drawRules(rules, at: y)
+                y = drawAcknowledgment(acknowledgment, at: y)
+            case .freeform(let body):
+                y = drawFreeformBody(body, at: y)
+            }
             drawSignatureBlock(
                 printName: printName,
                 signature: signature,
@@ -49,6 +54,17 @@ struct FormRenderer {
                 at: y
             )
         }
+    }
+
+    private func drawFreeformBody(_ body: String, at y: CGFloat) -> CGFloat {
+        // Render whatever the manager typed as wrapped paragraphs. Newlines in
+        // the source become paragraph breaks; the rendered text inherits the
+        // same body-size font used for the structured intro/rules so the visual
+        // weight matches across template types.
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11)
+        ]
+        return drawWrappedText(body, attributes: attrs, at: y, extraSpacing: 18)
     }
 
     private func drawTitle(_ title: String, at y: CGFloat) -> CGFloat {

@@ -15,15 +15,18 @@ swiftpdf/
 │   ├── Local.xcconfig.example       # committed template (DROPBOX_APP_KEY placeholder)
 │   └── Local.xcconfig               # gitignored — real DROPBOX_APP_KEY value
 ├── Sources/                         # Swift source
-│   ├── SwiftPDFApp.swift            # @main, injects DropboxService, routes onOpenURL → handleRedirect
-│   ├── ContentView.swift            # root view — gates on dropbox.authState; either ConnectDropboxView or FormView
+│   ├── SwiftPDFApp.swift            # @main, injects DropboxService + TemplateStore, routes onOpenURL → handleRedirect
+│   ├── ContentView.swift            # root view — gates on dropbox.authState; either ConnectDropboxView or LibraryView
 │   ├── ConnectDropboxView.swift     # first-launch auth gate; orange "Connect Dropbox" CTA
-│   ├── FormView.swift               # signing UI — preview + Print Name + 200pt SignatureCanvas + Done
-│   ├── FormTemplate.swift           # Codable model + FormTemplate.generalSafetyV1 preset
-│   ├── FormRenderer.swift           # UIGraphicsPDFRenderer pipeline: template + values → PDF Data
+│   ├── LibraryView.swift            # template list (bundled + synced) + "+ New" + swipe edit/delete; ellipsis menu owns Disconnect Dropbox
+│   ├── TemplateEditorView.swift     # create/edit form (Title + freeform Body); header locked to KS standard
+│   ├── TemplateStore.swift          # @Observable @MainActor — merges bundled templates + Dropbox-synced JSON
+│   ├── FormView.swift               # signing UI — preview + Print Name + 200pt SignatureCanvas + Done; success interstitial
+│   ├── FormTemplate.swift           # Codable Hashable model with `content: FormContent` (.structured or .freeform) + bundled .generalSafetyV1
+│   ├── FormRenderer.swift           # UIGraphicsPDFRenderer pipeline: template + values → PDF Data (handles both content cases)
 │   ├── SignatureCanvas.swift        # UIViewRepresentable PKCanvasView wrapper
-│   ├── DropboxService.swift         # @Observable @MainActor — authState + authorize + handleRedirect + upload
-│   ├── DropboxConfig.swift          # reads App Key from Info.plist; preview-safe placeholder
+│   ├── DropboxService.swift         # @Observable @MainActor — auth + upload + template list/download/save/delete
+│   ├── DropboxConfig.swift          # App Key from Info.plist; /Signed + /Templates folders
 │   └── DesignTokens.swift           # Color.kwikshipOrange (#FF5100) + warm-dark neutrals
 ├── Resources/                       # gitignored
 │   └── General Safety.pdf           # remnant from the Word-doc pipeline; no longer bundled
@@ -39,10 +42,10 @@ swiftpdf/
 xcconfig-based credential storage. `Local.xcconfig` (gitignored) defines `DROPBOX_APP_KEY` which xcodegen wires into `Info.plist` via `$(DROPBOX_APP_KEY)` substitution. Clone workflow: copy `.example` → real file, fill in, `xcodegen generate`. App reads the key at runtime via `Bundle.main.infoDictionary["DropboxAppKey"]`.
 
 ### `Sources/`
-Single iOS app target. Three layers (all flat in `Sources/`, no subdirectories yet):
-- **Entry/UI**: `SwiftPDFApp` (composition root) → `ContentView` → `FormView` (composes preview + signing panel) + `SignatureCanvas` (PencilKit wrapper).
-- **Model**: `FormTemplate` (pure data, Codable) + `FormRenderer` (template + filled values → PDF Data via UIGraphicsPDFRenderer).
-- **Services**: `DropboxService` (OAuth + upload) + `DropboxConfig` (key/folder/scopes; preview-safe).
+Single iOS app target. Four layers (all flat in `Sources/`, no subdirectories yet):
+- **Entry/UI**: `SwiftPDFApp` (composition root) → `ContentView` → `LibraryView` → `FormView` (composes preview + signing panel) + `SignatureCanvas` (PencilKit wrapper). `TemplateEditorView` is presented as a sheet from `LibraryView` for create/edit.
+- **Model**: `FormTemplate` (pure data, Codable Hashable) with `FormContent` enum (`.structured(intro/rules/acknowledgment)` for bundled templates, `.freeform(body:)` for manager-authored) + `FormRenderer` (template + filled values → PDF Data via UIGraphicsPDFRenderer; switches on content case).
+- **Services**: `TemplateStore` (@Observable; merges bundled templates with Dropbox-synced JSON) + `DropboxService` (OAuth + upload + template CRUD) + `DropboxConfig` (key/folders/scopes; preview-safe).
 - **Theme**: `DesignTokens` — Color extensions for brand palette.
 
 ### `Resources/`
@@ -53,11 +56,15 @@ Source materials (Word docs). Gitignored. Not bundled. Original source of the Ge
 
 ## Cross-references
 
-- `SwiftPDFApp` → instantiates `DropboxService` via `@State`, injects via `.environment(dropbox)`, routes `onOpenURL` → `dropbox.handleRedirect(url)`.
-- `ContentView` → switches on `dropbox.authState`. Shows `ConnectDropboxView` for `.notAuthorized / .authorizing / .authFailed`. Shows `NavigationStack { FormView(template: .generalSafetyV1) }` when `.authorized`.
+- `SwiftPDFApp` → instantiates `DropboxService` + `TemplateStore` via `@State`, injects both via `.environment(...)`, routes `onOpenURL` → `dropbox.handleRedirect(url)`.
+- `ContentView` → switches on `dropbox.authState`. Shows `ConnectDropboxView` for `.notAuthorized / .authorizing / .authFailed`. Shows `NavigationStack { LibraryView() }` when `.authorized`.
 - `ConnectDropboxView` → reads `@Environment(DropboxService.self)`, locates topmost `UIViewController` via `UIApplication.shared.connectedScenes` for the OAuth presentation, calls `dropbox.authorize(from:)`.
-- `FormView` → reads `@Environment(DropboxService.self)`, holds `printName: String` + `signature: PKDrawing` state, on Done renders via `FormRenderer` and uploads via `DropboxService`. Caches the rendered `PendingUpload` between attempts so Retry doesn't re-render; `.onChange` on inputs invalidates the cache. Toolbar ellipsis menu offers Disconnect Dropbox (confirmation → `dropbox.unauthorize()`). On success, the bottom panel swaps from the signing form to a "Signed and Saved" interstitial with a "Sign Another" CTA (`signAnother()` clears inputs + status); 0.25s cross-dissolve.
-- `DropboxService.upload(_:filename:)` → on `CallError<Files.UploadError>.authError` / `.clientError(.oauthError)` calls `unauthorize()` and rethrows `ServiceError.notAuthorized` so `ContentView` routes back to `ConnectDropboxView`.
+- `LibraryView` → reads `@Environment(TemplateStore.self)`, lists `store.templates` (bundled first, then synced alphabetically). `NavigationLink(value: template)` → `FormView`. "+ New Template" sheet → `TemplateEditorView(template: nil)`. Swipe-trailing on `editable` rows → Edit/Delete; Edit presents `TemplateEditorView(template: existing)`. Bundled rows show a "BUILT-IN" capsule and have no swipe actions. Toolbar ellipsis menu owns Disconnect Dropbox confirmation. `.task` and `.refreshable` both call `store.refresh()`.
+- `TemplateEditorView` → reads `@Environment(TemplateStore.self)`, captures `title` + `bodyText`, shows a locked KS-standard header preview. Save builds a `FormTemplate(content: .freeform(body:))` and calls `store.save()`.
+- `TemplateStore.refresh()` → `dropbox.listTemplates()` → for each `TemplateRef`, `dropbox.downloadTemplate(at:)` + decode → merges with bundled (`[generalSafetyV1]`) and sorts the synced subset case-insensitively. One bad template logs and is skipped, not fatal. `loadState` surfaces sync errors to the Library footer.
+- `TemplateStore.save(_:)` / `.delete(_:)` → encode as `{uuid}.json` (overwrite mode), then update local `templates` list. Bundled templates are not editable/deletable.
+- `FormView` → reads `@Environment(DropboxService.self)`, holds `printName: String` + `signature: PKDrawing` state, on Done renders via `FormRenderer` and uploads via `DropboxService`. Caches the rendered `PendingUpload` between attempts so Retry doesn't re-render; `.onChange` on inputs invalidates the cache. On success, the bottom panel swaps from the signing form to a "Signed and Saved" interstitial with a "Sign Another" CTA (`signAnother()` clears inputs + status); 0.25s cross-dissolve.
+- `DropboxService.upload(_:filename:)` / `listTemplates()` / `downloadTemplate(at:)` / `saveTemplate(_:filename:)` / `deleteTemplate(at:)` → each call's CallError is generic on the route's error type; the shared `isAuthFailure(_:)` helper catches `.authError` / `.clientError(.oauthError)` → calls `unauthorize()` + rethrows `ServiceError.notAuthorized` so `ContentView` routes back to `ConnectDropboxView`. `listTemplates()` additionally treats `.routeError(.path(.notFound))` as an empty list (the /Templates folder is auto-created on first save).
 - `FormRenderer` → reads `FormTemplate` + filled values, draws to `UIGraphicsPDFRenderer` context using `NSAttributedString` for text flow + `PKDrawing.image(from:scale:)` for the signature stroke render. Page size hardcoded to US Letter portrait.
 - `DropboxConfig.appKey` → loaded once via `Bundle.main.infoDictionary["DropboxAppKey"]` (substituted from xcconfig at build time). Falls back to `"PREVIEW_PLACEHOLDER"` in SwiftUI previews to avoid fatalError in canvas.
 - `DropboxService.upload(_:filename:)` → uses `client.files.upload(path:, mode:.add, autorename:true, input:)` from SwiftyDropbox 10.2.4 (async/await).

@@ -9,13 +9,15 @@ struct ContentView: View {
             ConnectDropboxView()
         case .authorized:
             NavigationStack {
-                FormView(template: .generalSafetyV1)
+                LibraryView()
             }
         }
     }
 }
 
 #Preview("Connect screen") {
+    let dropbox = DropboxService()
     ContentView()
-        .environment(DropboxService())
+        .environment(dropbox)
+        .environment(TemplateStore(dropbox: dropbox))
 }

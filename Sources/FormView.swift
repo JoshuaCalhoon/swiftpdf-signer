@@ -10,7 +10,6 @@ struct FormView: View {
     @State private var isUploading = false
     @State private var status: Status = .idle
     @State private var pendingUpload: PendingUpload?
-    @State private var showDisconnectConfirm = false
 
     enum Status: Equatable {
         case idle
@@ -34,32 +33,6 @@ struct FormView: View {
         .animation(.easeOut(duration: 0.25), value: isSuccessShowing)
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) {
-                        showDisconnectConfirm = true
-                    } label: {
-                        Label("Disconnect Dropbox", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .accessibilityLabel("More options")
-                }
-            }
-        }
-        .confirmationDialog(
-            "Disconnect from Dropbox?",
-            isPresented: $showDisconnectConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Disconnect", role: .destructive) {
-                dropbox.unauthorize()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("You'll need to reconnect on this iPad before you can upload signed forms again.")
-        }
         .onChange(of: printName) { _, _ in invalidateAfterEdit() }
         .onChange(of: signature) { _, _ in invalidateAfterEdit() }
     }
@@ -259,27 +232,35 @@ struct TemplateBody: View {
 
             headerTable
 
-            Text(template.intro)
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
+            switch template.content {
+            case .structured(let intro, let rules, let acknowledgment):
+                Text(intro)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(template.rules.enumerated()), id: \.offset) { index, rule in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(index + 1).")
-                            .frame(width: 24, alignment: .trailing)
-                        Text(rule)
-                            .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(rules.enumerated()), id: \.offset) { index, rule in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(index + 1).")
+                                .frame(width: 24, alignment: .trailing)
+                            Text(rule)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
+
+                Divider().padding(.vertical, 8)
+
+                Text(acknowledgment)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .freeform(let body):
+                Text(body)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Divider().padding(.vertical, 8)
-
-            Text(template.acknowledgment)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

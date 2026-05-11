@@ -2,8 +2,9 @@
 _(none — end-to-end pipeline validated)_
 
 ## Next
-- [ ] **Feature: in-app template creation** — let managers create new templates (KS standard header stays fixed; user supplies doc title + body text). Needs design discussion: shape of "body" (freeform vs. preserving the numbered-rules / intro / acknowledgment structure), entry point (Home screen with template picker?), and persistence (JSON files in Documents directory).
+- [ ] **Validate template creation end-to-end**: create a new template via the Library screen, sign it, verify the signed PDF lands in `/Apps/SwiftPDF/Signed/` with the right name; verify the template's JSON shows up in `/Apps/SwiftPDF/Templates/`; verify edit + delete work; verify Library refreshes on pull-down.
 - [ ] Keyboard avoidance behind the signature canvas if it comes up during real-world testing
+- [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
 - [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)
@@ -31,3 +32,4 @@ _(none — end-to-end pipeline validated)_
 - [x] Error-paths polish pass: cache rendered PDF + Retry button on failure; ellipsis-menu Disconnect Dropbox with confirmation; auth failures during upload (token revoked / refresh fail) clear local auth so ContentView routes back to ConnectDropboxView
 - [x] **End-to-end pipeline validated** (2026-05-11): OAuth round-trip works in the simulator, one real signed upload landed in `/Apps/SwiftPDF/Signed/` with the correct filename, ellipsis menu Disconnect button verified visible
 - [x] Success interstitial: bottom panel swaps to "Signed and Saved" + "Sign Another" CTA after upload (supersedes prior auto-dismiss banner + auto-clear behavior); see design.md decision log
+- [x] **In-app template creation** (2026-05-11): Library screen replaces hardcoded route; `FormContent` enum splits structured (bundled General Safety) from freeform (user-authored); TemplateEditorView for create/edit; swipe-to-edit/delete on user templates; templates sync via Dropbox `/Apps/SwiftPDF/Templates/` as `{uuid}.json` files; Disconnect Dropbox moves to the Library toolbar.
