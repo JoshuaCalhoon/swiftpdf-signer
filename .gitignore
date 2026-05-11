@@ -34,3 +34,9 @@ Configuration/Local.xcconfig
 # IDE
 .vscode/
 .idea/
+
+# Code/security review artifacts — generated locally, kept out of git
+CLAUDE-REVIEW.md
+REVIEW.md
+SECURITY-REVIEW.md
+.gstack/
