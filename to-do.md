@@ -1,9 +1,9 @@
 ## In progress
-- [ ] **User: tap "Connect Dropbox" in the simulator (or on a real iPad)** and complete the OAuth round-trip — confirms the auth gate + URL scheme work end-to-end
-- [ ] **User: do one real signed upload** — type a Print Name, sign, tap Done. Verify a file with name `General Safety Rules - {YourName} [{YYYY-MM-DD}].pdf` lands in your Dropbox under `/Apps/SwiftPDF/Signed/`.
+_(none — end-to-end pipeline validated)_
 
 ## Next
-- [ ] Real-world polish after end-to-end testing: success banner auto-dismiss (design.md spec says 2s on success), keyboard avoidance behind the signature canvas, possibly a "Sign Another" interstitial after success
+- [ ] **Feature: in-app template creation** — let managers create new templates (KS standard header stays fixed; user supplies doc title + body text). Needs design discussion: shape of "body" (freeform vs. preserving the numbered-rules / intro / acknowledgment structure), entry point (Home screen with template picker?), and persistence (JSON files in Documents directory).
+- [ ] Keyboard avoidance behind the signature canvas if it comes up during real-world testing
 - [ ] Build for a real iPad (USB or wireless deployment via Xcode — need a free Apple Developer team for code signing)
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)
@@ -29,3 +29,5 @@
 - [x] Confirmed Connect Dropbox screen renders on the simulator
 - [x] FormRenderer fix: use `UIGraphicsPDFRendererContext.beginPage()` (replace the `UIGraphicsGetCurrentContext()?.beginPDFPage(nil)` path)
 - [x] Error-paths polish pass: cache rendered PDF + Retry button on failure; ellipsis-menu Disconnect Dropbox with confirmation; auth failures during upload (token revoked / refresh fail) clear local auth so ContentView routes back to ConnectDropboxView
+- [x] **End-to-end pipeline validated** (2026-05-11): OAuth round-trip works in the simulator, one real signed upload landed in `/Apps/SwiftPDF/Signed/` with the correct filename, ellipsis menu Disconnect button verified visible
+- [x] Success interstitial: bottom panel swaps to "Signed and Saved" + "Sign Another" CTA after upload (supersedes prior auto-dismiss banner + auto-clear behavior); see design.md decision log

@@ -29,8 +29,9 @@ struct FormView: View {
         VStack(spacing: 0) {
             preview
             Divider()
-            signingPanel
+            bottomPanel
         }
+        .animation(.easeOut(duration: 0.25), value: isSuccessShowing)
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -69,6 +70,48 @@ struct FormView: View {
                 .padding()
                 .frame(maxWidth: 720, alignment: .leading)
         }
+    }
+
+    private var isSuccessShowing: Bool {
+        if case .success = status { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var bottomPanel: some View {
+        if case .success(let path) = status {
+            successPanel(path: path)
+                .transition(.opacity)
+        } else {
+            signingPanel
+                .transition(.opacity)
+        }
+    }
+
+    private func successPanel(path: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.kwikshipOrange)
+            Text("Signed and Saved")
+                .font(.title2.bold())
+            Text(path)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Button(action: signAnother) {
+                Text("Sign Another")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.kwikshipOrange)
+            .controlSize(.large)
+            .padding(.top, 4)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
     }
 
     private var signingPanel: some View {
@@ -126,18 +169,13 @@ struct FormView: View {
 
     @ViewBuilder
     private var statusBanner: some View {
-        switch status {
-        case .idle:
-            EmptyView()
-        case .success(let path):
-            Label("Uploaded to \(path)", systemImage: "checkmark.circle.fill")
-                .font(.callout)
-                .foregroundStyle(Color.kwikshipOrange)
-        case .failure(let message):
+        if case .failure(let message) = status {
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
                 .foregroundStyle(Color(.systemRed))
         }
+        // .success is rendered by `successPanel` — the bottom panel swaps wholesale.
+        // .idle renders nothing.
     }
 
     private var canSubmit: Bool {
@@ -173,20 +211,27 @@ struct FormView: View {
             let path = try await dropbox.upload(upload.data, filename: upload.filename)
             status = .success(path: path)
             pendingUpload = nil
-            printName = ""
-            signature = PKDrawing()
+            // Inputs are left filled until the user taps "Sign Another" — the
+            // success panel owns the reset so the manager has a clear hand-back
+            // moment instead of a form that snaps back to blank.
         } catch {
             status = .failure(message: error.localizedDescription)
         }
     }
 
-    /// Drops the cached PDF + clears any retry banner whenever the inputs change,
-    /// so a fresh edit always renders fresh. Leaves a `.success` banner alone —
-    /// SwiftUI batches the post-submit `printName`/`signature` resets, and clearing
-    /// success here would knock the banner out before it ever displays.
+    private func signAnother() {
+        status = .idle
+        printName = ""
+        signature = PKDrawing()
+    }
+
+    /// Drops the cached PDF and any non-idle status whenever inputs change,
+    /// so a fresh edit always re-renders from scratch. The success state is
+    /// dismissed via `signAnother()`, not by editing — by the time onChange
+    /// fires here, `status` is already `.idle`.
     private func invalidateAfterEdit() {
         pendingUpload = nil
-        if case .failure = status {
+        if status != .idle {
             status = .idle
         }
     }
