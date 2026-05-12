@@ -61,6 +61,10 @@ struct FormView: View {
         }
         .onChange(of: printName) { _, _ in invalidateAfterEdit() }
         .onChange(of: signature) { _, _ in invalidateAfterEdit() }
+        // The customer signing flow begins here. Drop any cached manager auth
+        // so a curious customer can't ride the manager's grace window to tap
+        // Exit and reach the library.
+        .onAppear { ManagerGate.invalidate() }
     }
 
     /// Returns to the Library after a manager re-authenticates. Customer
