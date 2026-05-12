@@ -39,4 +39,5 @@ Configuration/Local.xcconfig
 CLAUDE-REVIEW.md
 REVIEW.md
 SECURITY-REVIEW.md
+REMEDIATION-PLAN.md
 .gstack/
