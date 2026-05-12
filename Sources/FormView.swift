@@ -210,15 +210,27 @@ struct FormView: View {
     }
 
     private func makeFilename(for name: String, on date: Date) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let dateStr = dateFormatter.string(from: date)
-        let safeName = name
-            .trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-        return "\(template.name) - \(safeName) [\(dateStr)].pdf"
+        let dateStr = Self.filenameDateFormatter.string(from: date)
+        let safeTemplate = template.name.sanitizedForFilename(fallback: "Template")
+        let safeName = name.sanitizedForFilename(fallback: "Unknown")
+        let stem = "\(safeTemplate) - \(safeName) [\(dateStr)]"
+        // Dropbox enforces a 255-byte name limit. Leave 15 bytes of headroom
+        // for ` (1).pdf` autorename suffixes and the extension itself.
+        return "\(stem.truncatedToUTF8Bytes(240)).pdf"
     }
+
+    /// `en_US_POSIX` so the year is always Gregorian even if a customer has
+    /// switched the device into a non-Western locale. Pinned to America/Chicago
+    /// (KwikShip HQ) so the filename date doesn't shift around when the iPad
+    /// happens to be sitting in a different timezone than `signedAt: Date()`.
+    private static let filenameDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }
 
 struct TemplateBody: View {

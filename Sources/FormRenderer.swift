@@ -10,8 +10,14 @@ struct FormRenderer {
 
     static let kwikshipOrange = UIColor(red: 1.0, green: 0x51 / 255.0, blue: 0, alpha: 1.0)
 
+    /// Pinned to `en_US_POSIX` + Gregorian + America/Chicago so the in-PDF
+    /// "Date" field reads consistently regardless of the iPad's regional
+    /// settings, and matches the filename's date convention from `FormView`.
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
         f.dateFormat = "MMMM d, yyyy"
         return f
     }()
