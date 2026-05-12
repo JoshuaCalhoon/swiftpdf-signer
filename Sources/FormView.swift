@@ -13,7 +13,11 @@ struct FormView: View {
 
     enum Status: Equatable {
         case idle
-        case success(path: String)
+        /// `autorenamedFrom` is non-nil when Dropbox's `autorename: true` kicked
+        /// in (a duplicate filename existed and the upload landed as
+        /// `…(1).pdf`). The success panel surfaces this so the manager knows
+        /// to check for a sibling file before filing.
+        case success(path: String, autorenamedFrom: String?)
         case failure(message: String)
     }
 
@@ -56,8 +60,8 @@ struct FormView: View {
 
     @ViewBuilder
     private var bottomPanel: some View {
-        if case .success(let path) = status {
-            successPanel(path: path)
+        if case .success(let path, let renamedFrom) = status {
+            successPanel(path: path, autorenamedFrom: renamedFrom)
                 .transition(.opacity)
         } else {
             signingPanel
@@ -65,7 +69,7 @@ struct FormView: View {
         }
     }
 
-    private func successPanel(path: String) -> some View {
+    private func successPanel(path: String, autorenamedFrom: String?) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
@@ -77,6 +81,13 @@ struct FormView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+            if autorenamedFrom != nil {
+                Label("Dropbox auto-renamed to avoid a duplicate. A sibling file may already exist.", systemImage: "exclamationmark.bubble.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
             Button(action: signAnother) {
                 Text("Sign Another")
                     .frame(maxWidth: .infinity)
@@ -173,6 +184,12 @@ struct FormView: View {
     }
 
     private func submit() async {
+        // Belt + suspenders against a fast double-tap: @MainActor serializes
+        // the flag write but the SwiftUI Button can still fire two `Task`s
+        // back-to-back before `isUploading = true` lands. Without this guard
+        // both would proceed and Dropbox's `autorename: true` would produce
+        // two near-duplicate files.
+        guard !isUploading else { return }
         isUploading = true
         defer { isUploading = false }
 
@@ -203,12 +220,26 @@ struct FormView: View {
         }
 
         do {
-            let path = try await dropbox.upload(upload.data, filename: upload.filename)
-            status = .success(path: path)
+            let resolved = try await dropbox.upload(upload.data, filename: upload.filename)
+            // Detect Dropbox's autorename: if the returned path's filename
+            // differs from what we asked for, mark the success so the manager
+            // sees the warning. App-folder scope means `pathDisplay` looks
+            // like "/Signed/{filename}".
+            let requestedPath = "\(DropboxConfig.uploadFolder)/\(upload.filename)"
+            let autorenamedFrom = resolved.caseInsensitiveCompare(requestedPath) == .orderedSame
+                ? nil
+                : requestedPath
+            status = .success(path: resolved, autorenamedFrom: autorenamedFrom)
             pendingUpload = nil
             // Inputs are left filled until the user taps "Sign Another" — the
             // success panel owns the reset so the manager has a clear hand-back
             // moment instead of a form that snaps back to blank.
+        } catch DropboxService.ServiceError.notAuthorized {
+            // ContentView owns the re-auth UI by switching on dropbox.authState.
+            // Clear our local status so the failure banner doesn't double-display
+            // alongside the connect screen.
+            status = .idle
+            pendingUpload = nil
         } catch {
             status = .failure(message: error.localizedDescription)
         }
@@ -224,7 +255,14 @@ struct FormView: View {
     /// so a fresh edit always re-renders from scratch. The success state is
     /// dismissed via `signAnother()`, not by editing — by the time onChange
     /// fires here, `status` is already `.idle`.
+    ///
+    /// Skipped while `isUploading` so a stray stylus tap mid-upload (which
+    /// fires `onChange(of: signature)`) doesn't drop the cached `PendingUpload`
+    /// while the server is mid-write. Without this, a transient failure +
+    /// retry path could end up uploading a freshly-rendered PDF with a
+    /// different `signedAt` than the first attempt.
     private func invalidateAfterEdit() {
+        guard !isUploading else { return }
         pendingUpload = nil
         if status != .idle {
             status = .idle

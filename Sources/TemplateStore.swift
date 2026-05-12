@@ -67,18 +67,24 @@ final class TemplateStore {
 
     /// Saves `template` to Dropbox and updates the local list. Used for both
     /// create and edit — `mode: .overwrite` handles both paths.
+    ///
+    /// After the `await`, the local `templates` array may have been replaced
+    /// by a concurrent `refresh()` — both methods are `@MainActor` so they
+    /// can't interleave non-await turns, but the suspension point hands the
+    /// run-loop back. We reconstruct the array from scratch instead of
+    /// patching by index, so the result is correct regardless of what
+    /// `refresh` did with the bundled-vs-user partitioning while we waited.
     func save(_ template: FormTemplate) async throws {
         guard template.editable else {
             throw StoreError.notEditable
         }
         let data = try Self.encoder.encode(template)
         _ = try await dropbox.saveTemplate(data, filename: Self.filename(for: template))
-        if let idx = templates.firstIndex(where: { $0.id == template.id }) {
-            templates[idx] = template
-        } else {
-            templates.append(template)
-            templates = bundled + templates.dropFirst(bundled.count)
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let bundledIDs = Set(bundled.map(\.id))
+        var user = templates.filter { !bundledIDs.contains($0.id) && $0.id != template.id }
+        user.append(template)
+        templates = bundled + user.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
