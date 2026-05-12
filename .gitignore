@@ -41,3 +41,7 @@ REVIEW.md
 SECURITY-REVIEW.md
 REMEDIATION-PLAN.md
 .gstack/
+
+# Project-memory workflow files — local context for AI coding sessions, not for publication.
+# Contains: architecture.md, design.md, mapfile.md, nextchat.md, project-memory.md, to-do.md.
+internal/
