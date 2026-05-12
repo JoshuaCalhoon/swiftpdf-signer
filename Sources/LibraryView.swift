@@ -10,6 +10,7 @@ struct LibraryView: View {
     @State private var deleting: FormTemplate?
     @State private var deleteError: String?
     @State private var gateError: String?
+    @State private var inFlightDeletes: Set<UUID> = []
 
     var body: some View {
         listView
@@ -108,12 +109,21 @@ struct LibraryView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            Button {
-                editing = template
-            } label: {
-                Label("Edit", systemImage: "pencil")
+            // Disable the swipe action for a row whose delete is mid-flight so
+            // a second tap can't fire a duplicate `deleteV2` call (harmless but
+            // produces a misleading "couldn't delete" alert for a delete that
+            // already succeeded).
+            .disabled(inFlightDeletes.contains(template.id))
+            // Edit is only safe for freeform content — the editor doesn't know
+            // how to round-trip `.structured(...)` and would flatten it on save.
+            if case .freeform = template.content {
+                Button {
+                    editing = template
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Color.kwikshipOrange)
             }
-            .tint(Color.kwikshipOrange)
         }
     }
 
@@ -137,6 +147,8 @@ struct LibraryView: View {
     }
 
     private func performDelete(_ template: FormTemplate) async {
+        inFlightDeletes.insert(template.id)
+        defer { inFlightDeletes.remove(template.id) }
         do {
             try await store.delete(template)
         } catch {

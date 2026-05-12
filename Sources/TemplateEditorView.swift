@@ -11,8 +11,11 @@ struct TemplateEditorView: View {
 
     @State private var title: String = ""
     @State private var bodyText: String = ""
+    @State private var initialTitle: String = ""
+    @State private var initialBody: String = ""
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var showDiscardConfirm = false
 
     private var isEditing: Bool { template != nil }
     private var navigationTitle: String { isEditing ? "Edit Template" : "New Template" }
@@ -64,8 +67,14 @@ struct TemplateEditorView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") { dismiss() }
-                            .disabled(isSaving)
+                        Button("Cancel") {
+                            if hasUnsavedChanges {
+                                showDiscardConfirm = true
+                            } else {
+                                dismiss()
+                            }
+                        }
+                        .disabled(isSaving)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(isEditing ? "Save" : "Create") {
@@ -75,10 +84,27 @@ struct TemplateEditorView: View {
                         .fontWeight(.semibold)
                     }
                 }
-                .interactiveDismissDisabled(isSaving)
+                // Block pull-to-dismiss while saving (already true) AND while
+                // there are unsaved edits — otherwise a stray swipe-down
+                // throws away the manager's typing without confirmation.
+                .interactiveDismissDisabled(isSaving || hasUnsavedChanges)
+                .confirmationDialog(
+                    "Discard changes?",
+                    isPresented: $showDiscardConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Discard", role: .destructive) { dismiss() }
+                    Button("Keep editing", role: .cancel) {}
+                } message: {
+                    Text("Your changes to this template haven't been saved yet.")
+                }
                 .onAppear(perform: prefill)
                 .overlay { savingOverlay }
         }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        title != initialTitle || bodyText != initialBody
     }
 
     private var lockedHeaderPreview: some View {
@@ -123,12 +149,26 @@ struct TemplateEditorView: View {
     private func prefill() {
         guard let template, title.isEmpty, bodyText.isEmpty else { return }
         title = template.name
-        if case .freeform(let existingBody) = template.content {
+        switch template.content {
+        case .freeform(let existingBody):
             bodyText = existingBody
+        case .structured:
+            // The editor only knows how to round-trip freeform content. Saving
+            // a structured template here would silently flatten it into
+            // `.freeform(body: "")` — data loss. The Library swipe action is
+            // already gated to freeform templates only; this assertion catches
+            // any future code path that bypasses that gate.
+            assertionFailure("TemplateEditorView opened with a structured template — caller must gate on `.freeform` content")
         }
+        // Snapshot the prefill values so `hasUnsavedChanges` knows the baseline.
+        initialTitle = title
+        initialBody = bodyText
     }
 
     private func save() async {
+        // Clear any prior error banner before this attempt so a successful
+        // save after a transient failure doesn't briefly display both.
+        saveError = nil
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedBody = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
 
