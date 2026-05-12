@@ -14,12 +14,20 @@ extension String {
     func sanitizedForFilename(fallback: String = "Untitled") -> String {
         let disallowed = CharacterSet(charactersIn: "/\\<>:\"|?*")
             .union(.controlCharacters)
+        // Trim leading/trailing whitespace AND dashes — the dash-trim drops
+        // separator artifacts left by splitting on disallowed chars at the
+        // start or end of the input (e.g. "/foo" -> "-foo" -> "foo").
+        let surroundTrim = CharacterSet.whitespacesAndNewlines
+            .union(CharacterSet(charactersIn: "-"))
         var cleaned = unicodeScalars
             .split { disallowed.contains($0) }
             .map(String.init)
             .joined(separator: "-")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        while cleaned.hasPrefix(".") { cleaned.removeFirst() }
+            .trimmingCharacters(in: surroundTrim)
+        while cleaned.hasPrefix(".") {
+            cleaned.removeFirst()
+            cleaned = cleaned.trimmingCharacters(in: surroundTrim)
+        }
         return cleaned.isEmpty ? fallback : cleaned
     }
 

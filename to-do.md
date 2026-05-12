@@ -9,6 +9,7 @@ _(none — end-to-end pipeline validated)_
 - [ ] (Optional, while waiting) Smoke-test device install via Xcode's free Personal Team — 7-day cert, fine for one-off confirmation that signing/install works before the paid cert lands.
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)
+- [ ] **`TemplateStoreTests`**: extract a `DropboxServiceProtocol` so the store can be unit-tested against a mocked Dropbox. Verifies `save()` create-vs-update branching, bundled-id reject path, `lastRefreshSkipCount` accounting. Deferred from commit 10 because the refactor of `DropboxService` (a `final class`) into a protocol abstraction was scope-larger than the test commit.
 
 ## Blocked / questions
 - App icon / launch screen branding — defer until v1 ships (cosmetic)
