@@ -73,3 +73,20 @@ Brand palette pulled from the KwikShip logo SVG (`#ff5100`, `#3d3935`, `#30261d`
 ### 2026-05-11 — KwikShip orange #FF5100 accent + adaptive dark mode approved
 **Change:** Primary accent locked to `#FF5100` (sourced from the live `KwikShip_Logo.svg`, not the `#E97132` originally lifted from the Word doc's "orange accent" style). Added supporting darks `#3D3935` and `#30261D` from the same SVG. Adaptive dark-mode behavior approved.
 **Why:** User asked to inspect kwikship.com for the design ethos. The live logo SVG yields the true brand color (`#ff5100` — bright industrial orange), distinct from Word's default orange accent (`#e97132`) used on the Effective-Date doc title. Site's visual ethos read as "industrial meets approachable, utility-focused with personality" — informs the choice to keep app chrome minimal and let the accent do the brand work.
+
+### 2026-05-11 — Persistent scroll indicator on FormView preview
+**Change:** `FormView.preview` adds `.scrollIndicators(.visible)` so the right-edge scrollbar is always shown on the rendered-template preview ScrollView. SwiftUI's default `.automatic` fades the indicator after a moment.
+**Why:** During simulator testing the auto-fade made the preview read as "all the content is here" even when there were more rules below the fold. The persistent indicator is the right visual cue for "scroll down to see more" — paired with the renderer-overflow fail-loud error message, the user can always tell whether content fits and whether it's being clipped from view.
+**Consequences:** This is the explicit pattern for any future preview-of-something-tall ScrollView in the app. If we add a long-form acknowledgment confirmation or a multi-page preview, use `.scrollIndicators(.visible)` there too.
+
+### 2026-05-11 — Inline-warning pattern: orange `exclamationmark.bubble.fill` Label
+**Change:** Two new inline-warning surfaces use the same compact `Label("...", systemImage: "exclamationmark.bubble.fill")` with `.foregroundStyle(.orange)`:
+- **Autorename note** in `FormView.successPanel` — appears below the saved path when Dropbox auto-renamed the file (duplicate already existed). `.font(.caption2)`.
+- **Sync-skip footer** in `LibraryView.footer` — appears below the template list when `TemplateStore.lastRefreshSkipCount > 0`. `.font(.caption)`.
+**Why:** Non-blocking advisory information needs a third weight between "success" (icon, brand orange) and "failure" (`.systemRed`). Orange `exclamationmark.bubble.fill` reads as "look at this when you have a moment" without raising alarm.
+**Consequences:** This is now the explicit advisory pattern. The brand orange isn't the same as `.orange` (the SwiftUI semantic color is a slightly different hue), but for these compact warnings the system color is the right call — the brand orange is reserved for affirmative actions.
+
+### 2026-05-11 — Biometric prompt is the security boundary; no in-app PIN UI
+**Change:** Customer-handoff lock and Disconnect Dropbox both go through `ManagerGate.require(...)`, which presents the standard iOS biometric / device-passcode prompt. The app draws no custom PIN UI of its own — the system sheet IS the visual.
+**Why:** Reuses the visual language every iOS user already knows. Drawing a custom PIN pad would invent a new on-screen pattern, require its own visual tokens, and miss the security ergonomics of Apple's prompt (correct keyboard, jiggle on bad attempt, etc.).
+**Consequences:** No new design tokens for this surface. The "ask IT to set a passcode" alert (when `ManagerGate` returns `.notConfigured`) uses the system `.alert` modifier with default chrome — no styling.
