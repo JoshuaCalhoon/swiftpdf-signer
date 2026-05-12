@@ -52,6 +52,7 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         DropboxAppKey: $(DROPBOX_APP_KEY)
+        NSFaceIDUsageDescription: Confirms a manager is present before returning to the template library or disconnecting Dropbox. The customer signing on this iPad should never be able to trigger these actions.
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLName: com.kwikship.swiftpdf.dropbox

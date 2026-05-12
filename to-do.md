@@ -5,6 +5,7 @@ _(none — end-to-end pipeline validated)_
 - [ ] **Validate template creation end-to-end**: create a new template via the Library screen, sign it, verify the signed PDF lands in `/Apps/SwiftPDF/Signed/` with the right name; verify the template's JSON shows up in `/Apps/SwiftPDF/Templates/`; verify edit + delete work; verify Library refreshes on pull-down.
 - [ ] Keyboard avoidance behind the signature canvas if it comes up during real-world testing
 - [ ] **Install on the real iPad** (blocked on Apple Developer Program approval): once approved, fill `DEVELOPMENT_TEAM` in `Configuration/Local.xcconfig`, run `xcodegen generate`, plug iPad in via USB-C, enable Developer Mode on the iPad, run from Xcode. Wireless after first install via Window → Devices & Simulators → "Connect via Network".
+  - **Required iPad setup before handoff:** the iPad must have a device passcode set in iOS Settings → Face ID & Passcode (or Touch ID & Passcode). The customer-handoff lock (`ManagerGate`) falls back to the device passcode when biometrics fail. Without a passcode the gate refuses to authenticate and the manager can't return to the Library.
 - [ ] (Optional, while waiting) Smoke-test device install via Xcode's free Personal Team — 7-day cert, fine for one-off confirmation that signing/install works before the paid cert lands.
 - [ ] v1.1: in-app template editor (deferred — task #13)
 - [ ] Revisit Swift 6 mode once SwiftyDropbox catches up (`SwiftyDropbox` 10.2.4 static singleton triggers strict concurrency errors)

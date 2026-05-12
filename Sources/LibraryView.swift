@@ -9,6 +9,7 @@ struct LibraryView: View {
     @State private var editing: FormTemplate?
     @State private var deleting: FormTemplate?
     @State private var deleteError: String?
+    @State private var gateError: String?
 
     var body: some View {
         listView
@@ -28,6 +29,7 @@ struct LibraryView: View {
                 showDisconnectConfirm: $showDisconnectConfirm,
                 deleting: $deleting,
                 deleteError: $deleteError,
+                gateError: $gateError,
                 onDisconnect: { dropbox.unauthorize() },
                 onConfirmDelete: { template in
                     Task { await performDelete(template) }
@@ -71,7 +73,7 @@ struct LibraryView: View {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button(role: .destructive) {
-                    showDisconnectConfirm = true
+                    Task { await tryDisconnect() }
                 } label: {
                     Label("Disconnect Dropbox", systemImage: "rectangle.portrait.and.arrow.right")
                 }
@@ -79,6 +81,22 @@ struct LibraryView: View {
                 Image(systemName: "ellipsis.circle")
                     .accessibilityLabel("More options")
             }
+        }
+    }
+
+    /// Disconnect Dropbox affects every iPad on this account and is exactly
+    /// the kind of action a non-trusted customer should never trigger. Gate
+    /// it behind a manager re-auth before even showing the confirm dialog.
+    private func tryDisconnect() async {
+        switch await ManagerGate.require(reason: "Disconnect Dropbox") {
+        case .authenticated:
+            showDisconnectConfirm = true
+        case .userCancelled:
+            break
+        case .notConfigured:
+            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+        case .failed(let message):
+            gateError = message
         }
     }
 
@@ -134,6 +152,7 @@ private struct LibraryDialogs: ViewModifier {
     @Binding var showDisconnectConfirm: Bool
     @Binding var deleting: FormTemplate?
     @Binding var deleteError: String?
+    @Binding var gateError: String?
     let onDisconnect: () -> Void
     let onConfirmDelete: (FormTemplate) -> Void
 
@@ -173,6 +192,17 @@ private struct LibraryDialogs: ViewModifier {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(deleteError ?? "")
+            }
+            .alert(
+                "Manager authentication required",
+                isPresented: Binding(
+                    get: { gateError != nil },
+                    set: { if !$0 { gateError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(gateError ?? "")
             }
     }
 }

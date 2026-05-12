@@ -5,11 +5,13 @@ struct FormView: View {
     let template: FormTemplate
 
     @Environment(DropboxService.self) private var dropbox
+    @Environment(\.dismiss) private var dismiss
     @State private var printName = ""
     @State private var signature = PKDrawing()
     @State private var isUploading = false
     @State private var status: Status = .idle
     @State private var pendingUpload: PendingUpload?
+    @State private var gateError: String?
 
     enum Status: Equatable {
         case idle
@@ -37,8 +39,42 @@ struct FormView: View {
         .animation(.easeOut(duration: 0.25), value: isSuccessShowing)
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.inline)
+        // Hide the system back button so a customer can't navigate back to
+        // the Library and disconnect Dropbox / edit templates while they hold
+        // the iPad. The toolbar's "Exit" button replaces it, gated by
+        // ManagerGate (FaceID / TouchID / device passcode).
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Exit") { Task { await tryExit() } }
+                    .disabled(isUploading)
+            }
+        }
+        .alert("Couldn't return to library", isPresented: Binding(
+            get: { gateError != nil },
+            set: { if !$0 { gateError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(gateError ?? "")
+        }
         .onChange(of: printName) { _, _ in invalidateAfterEdit() }
         .onChange(of: signature) { _, _ in invalidateAfterEdit() }
+    }
+
+    /// Returns to the Library after a manager re-authenticates. Customer
+    /// taps Exit → FaceID / passcode prompt → success pops, failure stays.
+    private func tryExit() async {
+        switch await ManagerGate.require(reason: "Return to template library") {
+        case .authenticated:
+            dismiss()
+        case .userCancelled:
+            break
+        case .notConfigured:
+            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+        case .failed(let message):
+            gateError = message
+        }
     }
 
     private var preview: some View {
