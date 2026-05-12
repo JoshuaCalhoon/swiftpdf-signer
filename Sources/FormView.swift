@@ -238,7 +238,10 @@ struct FormView: View {
         if let existing = pendingUpload {
             upload = existing
         } else {
-            let renderer = FormRenderer(brandColor: settings.brandUIColor)
+            let renderer = FormRenderer(
+                brandColor: settings.brandUIColor,
+                companyLogo: settings.companyLogo
+            )
             let now = Date()
             do {
                 let pdfData = try renderer.render(
@@ -381,11 +384,19 @@ struct TemplateBody: View {
     }
 
     private var headerTable: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            row("Company", template.header.company)
-            row("Location", template.header.location)
-            row("Department", template.header.department)
-            row("Effective Date", template.header.effectiveDate.formatted(date: .long, time: .omitted))
+        HStack(alignment: .top, spacing: 12) {
+            if let logo = settings.companyLogo {
+                Image(uiImage: logo)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                row("Company", template.header.company)
+                row("Location", template.header.location)
+                row("Department", template.header.department)
+                row("Effective Date", template.header.effectiveDate.formatted(date: .long, time: .omitted))
+            }
         }
         .padding(12)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))

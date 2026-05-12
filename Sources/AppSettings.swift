@@ -45,6 +45,21 @@ final class AppSettings {
         }
     }
 
+    /// JPEG-encoded company logo, stored directly in `UserDefaults`. The
+    /// setter expects already-compressed bytes — callers should run images
+    /// through `compressLogoForStorage(_:)` first so a multi-megabyte
+    /// `PhotosPicker` payload doesn't end up in the plist.
+    var companyLogoData: Data? {
+        didSet {
+            guard companyLogoData != oldValue else { return }
+            if let data = companyLogoData {
+                defaults.set(data, forKey: Self.companyLogoKey)
+            } else {
+                defaults.removeObject(forKey: Self.companyLogoKey)
+            }
+        }
+    }
+
     private let defaults: UserDefaults
 
     /// `defaults` is injectable so tests can use an in-memory suite instead
@@ -55,6 +70,35 @@ final class AppSettings {
         self.companyName = defaults.string(forKey: Self.companyNameKey) ?? ""
         self.companyLocation = defaults.string(forKey: Self.companyLocationKey) ?? ""
         self.companyDepartment = defaults.string(forKey: Self.companyDepartmentKey) ?? ""
+        self.companyLogoData = defaults.data(forKey: Self.companyLogoKey)
+    }
+
+    /// Decoded `UIImage` view of `companyLogoData`. Returns nil if no logo is
+    /// set or the persisted bytes don't decode.
+    var companyLogo: UIImage? {
+        guard let companyLogoData else { return nil }
+        return UIImage(data: companyLogoData)
+    }
+
+    /// Aspect-preserving resize + JPEG encode for `PhotosPicker`-sourced
+    /// logos. `maxDimension` caps the longer side so a 4032×3024 photo
+    /// doesn't end up consuming hundreds of KB of `UserDefaults` plist
+    /// space. 512px at 0.85 quality lands around 30–80KB for typical
+    /// logo-shaped images.
+    nonisolated static func compressLogoForStorage(
+        _ image: UIImage,
+        maxDimension: CGFloat = 512,
+        quality: CGFloat = 0.85
+    ) -> Data? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let scale = min(1, maxDimension / max(size.width, size.height))
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        return resized.jpegData(compressionQuality: quality)
     }
 
     /// SwiftUI consumers. Falls back to `defaultBrandColor` if the stored hex
@@ -79,6 +123,7 @@ final class AppSettings {
     private static let companyNameKey = "companyName"
     private static let companyLocationKey = "companyLocation"
     private static let companyDepartmentKey = "companyDepartment"
+    private static let companyLogoKey = "companyLogoData"
     /// Matches `UIColor.systemOrange` resolved against a light trait collection
     /// (the way it'll render in the PDF). SwiftUI's `Color.orange` resolves to
     /// the same RGB so the in-app surface matches the PDF output.

@@ -19,8 +19,13 @@ struct FormRenderer {
     /// internal caller without settings access still render reasonably.
     let brandColor: UIColor
 
-    init(brandColor: UIColor = AppSettings.defaultBrandUIColor) {
+    /// Optional square logo drawn to the left of the header table. Aspect-fit
+    /// into a 64-pt slot; non-square images are letterboxed.
+    let companyLogo: UIImage?
+
+    init(brandColor: UIColor = AppSettings.defaultBrandUIColor, companyLogo: UIImage? = nil) {
         self.brandColor = brandColor
+        self.companyLogo = companyLogo
     }
 
     enum RenderError: LocalizedError {
@@ -123,7 +128,23 @@ struct FormRenderer {
         return y + 40
     }
 
+    /// Header layout: optional 64-pt square logo on the left, then a stacked
+    /// label/value table to its right. Without a logo, the table starts at
+    /// the page margin like before. The returned y is below whichever element
+    /// (logo or table) extended further, so the body content doesn't collide
+    /// with a tall logo.
     private func drawHeader(_ header: FormHeader, at y: CGFloat) -> CGFloat {
+        let logoSize: CGFloat = 64
+        let logoSpacing: CGFloat = 12
+
+        if let companyLogo {
+            drawAspectFit(
+                companyLogo,
+                in: CGRect(x: Self.margin, y: y, width: logoSize, height: logoSize)
+            )
+        }
+
+        let labelX = (companyLogo != nil ? Self.margin + logoSize + logoSpacing : Self.margin)
         let labelAttr: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 11, weight: .bold)
         ]
@@ -139,13 +160,13 @@ struct FormRenderer {
         ]
 
         let labelWidth: CGFloat = 110
-        let valueX = Self.margin + labelWidth + 8
+        let valueX = labelX + labelWidth + 8
         let valueWidth = Self.pageSize.width - valueX - Self.margin
         var currentY = y
 
         for (label, value) in rows {
             NSAttributedString(string: label, attributes: labelAttr)
-                .draw(at: CGPoint(x: Self.margin, y: currentY))
+                .draw(at: CGPoint(x: labelX, y: currentY))
             let valueStr = NSAttributedString(string: value, attributes: valueAttr)
             let bounds = valueStr.boundingRect(
                 with: CGSize(width: valueWidth, height: .greatestFiniteMagnitude),
@@ -155,7 +176,27 @@ struct FormRenderer {
             valueStr.draw(in: CGRect(x: valueX, y: currentY, width: valueWidth, height: bounds.height))
             currentY += max(18, ceil(bounds.height) + 2)
         }
-        return currentY + 12
+        // Account for a logo taller than the rendered text rows.
+        let endY = max(currentY, y + (companyLogo != nil ? logoSize : 0))
+        return endY + 12
+    }
+
+    /// Aspect-fits `image` inside `rect` and draws it in the current PDF
+    /// context. Wider-than-tall images vertically center; taller-than-wide
+    /// images horizontally center. Both produce letterboxing if aspect
+    /// differs from the rect.
+    private func drawAspectFit(_ image: UIImage, in rect: CGRect) {
+        let imageAspect = image.size.width / max(image.size.height, 0.0001)
+        let rectAspect = rect.width / max(rect.height, 0.0001)
+        let target: CGRect
+        if imageAspect > rectAspect {
+            let h = rect.width / imageAspect
+            target = CGRect(x: rect.minX, y: rect.midY - h / 2, width: rect.width, height: h)
+        } else {
+            let w = rect.height * imageAspect
+            target = CGRect(x: rect.midX - w / 2, y: rect.minY, width: w, height: rect.height)
+        }
+        image.draw(in: target)
     }
 
     private func drawIntro(_ intro: String, at y: CGFloat) -> CGFloat {

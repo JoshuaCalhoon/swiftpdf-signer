@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Manager-facing settings sheet. Entry point is gated by `ManagerGate` from
 /// `LibraryView`'s toolbar, so a customer signing on a shared iPad can't
@@ -12,6 +13,13 @@ struct SettingsView: View {
     /// `settings.brandColorHex` — that way UserDefaults sees one write per
     /// settled value, not per drag tick.
     @State private var workingColor: Color = AppSettings.defaultBrandColor
+
+    /// Holds the user's most-recent PhotosPicker selection while the image
+    /// data is being loaded asynchronously. Cleared back to nil after the
+    /// data lands in `settings.companyLogoData` so picking the same image
+    /// again still fires the change observer.
+    @State private var logoPickerItem: PhotosPickerItem?
+    @State private var logoLoadFailed = false
 
     var body: some View {
         // Local @Bindable shadow so we can derive bindings ($settings.foo)
@@ -33,6 +41,8 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+
+                logoSection
 
                 Section {
                     TextField("Company", text: $settings.companyName)
@@ -74,6 +84,14 @@ struct SettingsView: View {
                 }
                 settings.brandColorHex = hex
             }
+            .onChange(of: logoPickerItem) { _, newItem in
+                Task { await loadPickedLogo(newItem) }
+            }
+            .alert("Couldn't load image", isPresented: $logoLoadFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("The selected file isn't a readable image. Try a JPEG or PNG.")
+            }
         }
     }
 
@@ -98,6 +116,58 @@ struct SettingsView: View {
             .padding(.vertical, 4)
         } header: {
             Text("Preview")
+        }
+    }
+
+    @ViewBuilder
+    private var logoSection: some View {
+        Section {
+            if let logo = settings.companyLogo {
+                HStack(spacing: 16) {
+                    Image(uiImage: logo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 64, height: 64)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(.tertiarySystemFill))
+                        )
+                    PhotosPicker(selection: $logoPickerItem, matching: .images) {
+                        Text("Change logo")
+                    }
+                }
+                Button("Remove logo", role: .destructive) {
+                    settings.companyLogoData = nil
+                }
+            } else {
+                PhotosPicker(selection: $logoPickerItem, matching: .images) {
+                    Label("Add company logo", systemImage: "photo")
+                }
+            }
+        } header: {
+            Text("Company Logo")
+        } footer: {
+            Text("Optional. Renders at the left of the header on signed PDFs and in the in-app preview. Square images look best — non-square images are letterboxed inside a square slot.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func loadPickedLogo(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let compressed = AppSettings.compressLogoForStorage(image) else {
+                logoLoadFailed = true
+                logoPickerItem = nil
+                return
+            }
+            settings.companyLogoData = compressed
+            logoPickerItem = nil
+        } catch {
+            logoLoadFailed = true
+            logoPickerItem = nil
         }
     }
 }

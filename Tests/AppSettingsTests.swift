@@ -90,6 +90,54 @@ final class AppSettingsTests: XCTestCase {
     }
 
     @MainActor
+    func test_logo_persists_and_loads() {
+        let defaults = freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertNil(settings.companyLogo, "Fresh defaults have no logo")
+
+        // Fabricate a 100x60 red image, compress, persist.
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 60))
+        let image = renderer.image { ctx in
+            UIColor.red.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 100, height: 60))
+        }
+        let compressed = AppSettings.compressLogoForStorage(image, maxDimension: 100, quality: 0.85)
+        XCTAssertNotNil(compressed)
+        settings.companyLogoData = compressed
+
+        XCTAssertNotNil(defaults.data(forKey: "companyLogoData"))
+
+        // Reload from defaults — second AppSettings instance should see the
+        // same bytes and decode them to a UIImage.
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertNotNil(reloaded.companyLogo)
+    }
+
+    @MainActor
+    func test_logo_clear_removes_key() {
+        let defaults = freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.companyLogoData = Data([0xFF, 0xD8, 0xFF])  // doesn't decode as image, fine for round-trip
+        XCTAssertNotNil(defaults.data(forKey: "companyLogoData"))
+
+        settings.companyLogoData = nil
+        XCTAssertNil(defaults.data(forKey: "companyLogoData"))
+    }
+
+    func test_compress_logo_shrinks_oversized_image() {
+        // 2000x2000 source → max 512 → resized to 512x512 → JPEG should be
+        // well under 200KB.
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 2000))
+        let image = renderer.image { ctx in
+            UIColor.blue.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 2000, height: 2000))
+        }
+        let compressed = AppSettings.compressLogoForStorage(image, maxDimension: 512, quality: 0.85)
+        XCTAssertNotNil(compressed)
+        XCTAssertLessThan(compressed!.count, 200_000, "Compressed logo should be under 200KB")
+    }
+
+    @MainActor
     func test_color_round_trips_through_hex() {
         // ColorPicker → Color.toHex → UserDefaults → UIColor(hex:) round-trip
         // should preserve the 8-bit-per-channel value.
