@@ -43,6 +43,10 @@ struct FormView: View {
                 .padding()
                 .frame(maxWidth: 720, alignment: .leading)
         }
+        // Always-on scroll indicator so the user can tell at a glance whether
+        // the body extends past the visible area. SwiftUI's default fades the
+        // indicator after a moment, which reads as "all the content is here."
+        .scrollIndicators(.visible)
     }
 
     private var isSuccessShowing: Bool {
@@ -153,8 +157,19 @@ struct FormView: View {
 
     private var canSubmit: Bool {
         !printName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !signature.strokes.isEmpty
+            && hasUsableSignature
             && !isUploading
+    }
+
+    /// Rejects empty PKDrawings and degenerate strokes (a single tap, a
+    /// strictly-horizontal swipe, etc.). PencilKit can return a zero-dimension
+    /// `bounds` for those, and `FormRenderer.drawSignature` would silently
+    /// drop them — surface "Done" disabled instead so the customer realizes
+    /// their stroke didn't register.
+    private var hasUsableSignature: Bool {
+        guard !signature.strokes.isEmpty else { return false }
+        let b = signature.bounds
+        return b.width > 0.5 && b.height > 0.5
     }
 
     private func submit() async {
@@ -167,17 +182,24 @@ struct FormView: View {
         } else {
             let renderer = FormRenderer()
             let now = Date()
-            let pdfData = renderer.render(
-                template: template,
-                printName: printName,
-                signature: signature,
-                signedAt: now
-            )
-            upload = PendingUpload(
-                data: pdfData,
-                filename: makeFilename(for: printName, on: now)
-            )
-            pendingUpload = upload
+            do {
+                let pdfData = try renderer.render(
+                    template: template,
+                    printName: printName,
+                    signature: signature,
+                    signedAt: now
+                )
+                upload = PendingUpload(
+                    data: pdfData,
+                    filename: makeFilename(for: printName, on: now)
+                )
+                pendingUpload = upload
+            } catch {
+                // Renderer-side failure (currently only `RenderError.contentTooLong`)
+                // — surface and bail before touching Dropbox.
+                status = .failure(message: error.localizedDescription)
+                return
+            }
         }
 
         do {

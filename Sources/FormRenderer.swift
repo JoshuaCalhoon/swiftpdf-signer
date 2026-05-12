@@ -3,12 +3,29 @@ import PencilKit
 
 /// Renders a filled-and-signed `FormTemplate` to PDF Data.
 /// Uses `UIGraphicsPDFRenderer` + `NSAttributedString` for text flow.
-/// v1: single page, US Letter portrait.
+/// v1: single page, US Letter portrait. If content would overflow, `render`
+/// throws `RenderError.contentTooLong` — there's no silent truncation.
 struct FormRenderer {
     static let pageSize = CGSize(width: 612, height: 792)  // US Letter at 72dpi
     static let margin: CGFloat = 50
 
+    /// Reserved vertical space the signature block needs at the bottom of the
+    /// page. Matches `drawSignatureBlock`'s layout (Print Name / Date row +
+    /// signature box + signature line + a little breathing room).
+    static let signatureBlockHeight: CGFloat = 150
+
     static let kwikshipOrange = UIColor(red: 1.0, green: 0x51 / 255.0, blue: 0, alpha: 1.0)
+
+    enum RenderError: LocalizedError {
+        case contentTooLong
+
+        var errorDescription: String? {
+            switch self {
+            case .contentTooLong:
+                return "This template is too long to fit on one page. Shorten the body or split it into multiple templates."
+            }
+        }
+    }
 
     /// Pinned to `en_US_POSIX` + Gregorian + America/Chicago so the in-PDF
     /// "Date" field reads consistently regardless of the iPad's regional
@@ -27,7 +44,7 @@ struct FormRenderer {
         printName: String,
         signature: PKDrawing,
         signedAt: Date
-    ) -> Data {
+    ) throws -> Data {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
             kCGPDFContextTitle as String: "\(template.name) — \(printName)",
@@ -40,7 +57,14 @@ struct FormRenderer {
             format: format
         )
 
-        return renderer.pdfData { context in
+        // Capture overflow inside the closure (pdfData's block is non-throwing).
+        // If content pushes the signature off-page, throw after the renderer
+        // returns rather than silently producing a "signed" PDF whose signature
+        // doesn't exist.
+        var overflowed = false
+        let signatureCeiling = Self.pageSize.height - Self.margin - Self.signatureBlockHeight
+
+        let data = renderer.pdfData { context in
             context.beginPage()
             var y = Self.margin
             y = drawTitle(template.name, at: y)
@@ -53,6 +77,10 @@ struct FormRenderer {
             case .freeform(let body):
                 y = drawFreeformBody(body, at: y)
             }
+            if y > signatureCeiling {
+                overflowed = true
+                return  // signature block intentionally not drawn — we'll throw
+            }
             drawSignatureBlock(
                 printName: printName,
                 signature: signature,
@@ -60,6 +88,10 @@ struct FormRenderer {
                 at: y
             )
         }
+        if overflowed {
+            throw RenderError.contentTooLong
+        }
+        return data
     }
 
     private func drawFreeformBody(_ body: String, at y: CGFloat) -> CGFloat {
@@ -206,8 +238,14 @@ struct FormRenderer {
     private func drawSignature(_ drawing: PKDrawing, in rect: CGRect) {
         guard !drawing.strokes.isEmpty else { return }
         let sourceBounds = drawing.bounds
+        // Reject degenerate strokes (single point, perfect-horizontal-only,
+        // perfect-vertical-only). PencilKit's behavior on a zero-dimension
+        // bounds varies between iOS versions — this is the well-defined path.
+        // `FormView.canSubmit` performs the same check at the UI layer.
+        guard sourceBounds.width > 0.5, sourceBounds.height > 0.5 else { return }
+
         let image = drawing.image(from: sourceBounds, scale: 3.0)
-        let aspect = sourceBounds.width / max(sourceBounds.height, 1)
+        let aspect = sourceBounds.width / sourceBounds.height
         let availableAspect = rect.width / rect.height
         let target: CGRect
         if aspect > availableAspect {
