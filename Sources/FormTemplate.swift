@@ -90,24 +90,13 @@ extension FormHeader {
 }
 
 extension FormTemplate {
-    /// Sentinel UUIDs for bundled templates. Held in a single place so
-    /// `TemplateStore` can reject any synced JSON whose id matches — a malicious
-    /// or accidentally-edited file on Dropbox can't impersonate a built-in.
-    /// Future bundled templates extend this set; user-authored templates use
-    /// `UUID()` and won't collide.
-    enum BundledID {
-        static let sampleAcknowledgmentV1 = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
-
-        static let all: Set<UUID> = [sampleAcknowledgmentV1]
-    }
-
-    /// Built-in sample template — a generic placeholder so the library has
-    /// something to show on first launch before a manager creates real templates.
-    /// `editable: false` keeps it visible as documentation; managers replace
-    /// it by tapping "New Template".
-    static let sampleAcknowledgmentV1: FormTemplate = {
-        return FormTemplate(
-            id: BundledID.sampleAcknowledgmentV1,
+    /// Builds a fresh sample template with a unique UUID. Seeded by
+    /// `TemplateStore` on first run when the user's Dropbox templates folder
+    /// is empty — once seeded, the sample is a regular Dropbox-synced
+    /// template that the manager can edit, duplicate, or delete like any
+    /// other. Calling this twice returns two distinct templates.
+    static func makeFreshSample() -> FormTemplate {
+        FormTemplate(
             name: "Sample Acknowledgment Form",
             header: FormHeader(
                 company: "Your Company",
@@ -116,7 +105,7 @@ extension FormTemplate {
                 effectiveDate: Date()
             ),
             content: .structured(
-                intro: "This is a sample template demonstrating the structured form layout. To create your own form, tap New Template — or replace this template with one that fits your organization.",
+                intro: "This is a sample template demonstrating the structured form layout. To create your own form, tap New Template — or edit this one to fit your organization.",
                 rules: [
                     "Sample rule one — replace this text with content relevant to your form.",
                     "Sample rule two — rules render as a numbered list in the signed PDF.",
@@ -126,7 +115,7 @@ extension FormTemplate {
                 acknowledgment: "By signing below, I acknowledge that this is a sample form. Replace this template with one tailored to your organization before sharing it with signers."
             ),
             version: 1,
-            editable: false
+            editable: true
         )
-    }()
+    }
 }

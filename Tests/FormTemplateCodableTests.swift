@@ -37,13 +37,12 @@ final class FormTemplateCodableTests: XCTestCase {
     }
 
     func test_round_trips_structured_template() throws {
-        let template = FormTemplate.sampleAcknowledgmentV1
+        let template = FormTemplate.makeFreshSample()
         let data = try encoder.encode(template)
         let decoded = try decoder.decode(FormTemplate.self, from: data)
 
-        // editable=false survives a normal round-trip — the WR-10 concern
-        // is only about manually-edited JSON that omits the key.
-        XCTAssertFalse(decoded.editable)
+        XCTAssertEqual(decoded.id, template.id)
+        XCTAssertTrue(decoded.editable, "Sample seed must be editable so managers can morph it")
 
         switch decoded.content {
         case .structured(let intro, let rules, let acknowledgment):
@@ -51,8 +50,16 @@ final class FormTemplateCodableTests: XCTestCase {
             XCTAssertFalse(rules.isEmpty)
             XCTAssertFalse(acknowledgment.isEmpty)
         case .freeform:
-            XCTFail("Expected structured content for sampleAcknowledgmentV1")
+            XCTFail("Expected structured content for sample template")
         }
+    }
+
+    func test_fresh_sample_has_unique_ids() {
+        // Each call to makeFreshSample() produces a distinct UUID so a manager
+        // duplicating the seed (or re-seeding after wipe) never collides.
+        let a = FormTemplate.makeFreshSample()
+        let b = FormTemplate.makeFreshSample()
+        XCTAssertNotEqual(a.id, b.id)
     }
 
     func test_decode_defaults_editable_to_true_when_key_absent() throws {
@@ -81,13 +88,4 @@ final class FormTemplateCodableTests: XCTestCase {
         XCTAssertTrue(decoded.editable, "Missing `editable` key should default to true")
     }
 
-    func test_bundled_template_uses_sentinel_id() {
-        // CR-02: bundled UUIDs must be stable across launches.
-        // The sentinel value is what TemplateStore.refresh checks against.
-        XCTAssertEqual(
-            FormTemplate.sampleAcknowledgmentV1.id,
-            FormTemplate.BundledID.sampleAcknowledgmentV1
-        )
-        XCTAssertTrue(FormTemplate.BundledID.all.contains(FormTemplate.sampleAcknowledgmentV1.id))
-    }
 }

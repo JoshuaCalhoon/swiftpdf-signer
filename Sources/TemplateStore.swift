@@ -2,23 +2,21 @@ import Foundation
 import Observation
 import os
 
-/// Owns the list of templates shown in `LibraryView`.
-/// Merges the bundled built-ins (e.g. `FormTemplate.sampleAcknowledgmentV1`) with
-/// user-authored templates synced from the app's `/Templates/` folder in Dropbox.
-///
-/// Bundled templates are always visible and aren't deletable.
-/// User templates have `editable == true` and are written as one JSON file per
-/// template (`{uuid}.json`), with `mode: .overwrite` so an edit-and-save round-trip
-/// updates in place rather than autorenaming.
+/// Owns the list of templates shown in `LibraryView`. All templates are
+/// Dropbox-synced JSON files at `/Apps/{app}/Templates/{uuid}.json`; a sample
+/// template is seeded into Dropbox on the user's first launch (when the
+/// folder is empty) so the library has something to demonstrate the format.
+/// After seeding, the sample is just a regular template — fully editable,
+/// duplicatable, and deletable.
 @MainActor
 @Observable
 final class TemplateStore {
     private(set) var templates: [FormTemplate]
     private(set) var loadState: LoadState = .idle
-    /// Number of templates the most recent `refresh()` had to skip — either
-    /// corrupt JSON or bundled-id impersonation attempts. Surfaced in
-    /// `LibraryView`'s footer so the manager isn't left guessing about a
-    /// quietly-shorter list. Reset to zero at the top of each `refresh()`.
+    /// Number of templates the most recent `refresh()` had to skip due to
+    /// corrupt JSON. Surfaced in `LibraryView`'s footer so the manager isn't
+    /// left guessing about a quietly-shorter list. Reset to zero at the top
+    /// of each `refresh()`.
     private(set) var lastRefreshSkipCount: Int = 0
 
     private static let logger = Logger(
@@ -34,22 +32,23 @@ final class TemplateStore {
     }
 
     private let dropbox: DropboxService
-    private let bundled: [FormTemplate] = [.sampleAcknowledgmentV1]
+    private let defaults: UserDefaults
 
-    init(dropbox: DropboxService) {
+    init(dropbox: DropboxService, defaults: UserDefaults = .standard) {
         self.dropbox = dropbox
-        // Bundled templates are visible immediately so the UI has something to
-        // render even before the first sync completes (or if it fails).
-        self.templates = bundled
+        self.defaults = defaults
+        self.templates = []
     }
 
     /// Pulls the latest template set from Dropbox, decodes each, and rebuilds
-    /// `templates` as [bundled, ...synced sorted-by-name]. A failure leaves the
-    /// list intact at its last good state and surfaces a message via `loadState`.
+    /// `templates` sorted by name. A failure leaves the list intact at its
+    /// last good state and surfaces a message via `loadState`.
     ///
-    /// Any synced template whose `id` matches a bundled sentinel (see
-    /// `FormTemplate.BundledID`) is dropped — the in-app bundled copy is the
-    /// source of truth and a file on Dropbox can't override it.
+    /// First-run seeding: when the user has zero templates AND we haven't
+    /// seeded before on this iPad, write the sample template to Dropbox so
+    /// the library has something to show on first launch. The
+    /// `hasSeededSample` flag is local to the device, so a second iPad
+    /// joining an existing account won't re-seed.
     func refresh() async {
         loadState = .loading
         var skipped = 0
@@ -86,11 +85,6 @@ final class TemplateStore {
             for (ref, result) in outcomes {
                 switch result {
                 case .success(let decoded):
-                    if FormTemplate.BundledID.all.contains(decoded.id) {
-                        Self.logger.warning("Rejected bundled-id impersonation in \(ref.name, privacy: .public)")
-                        skipped += 1
-                        continue
-                    }
                     loaded.append(decoded)
                 case .failure(let error):
                     // Error body is `.private` because `DecodingError.dataCorrupted`
@@ -99,7 +93,24 @@ final class TemplateStore {
                     skipped += 1
                 }
             }
-            templates = bundled + loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+            // First-run seed. If the user has no templates and we haven't
+            // seeded yet on this iPad, upload the sample. A seed failure is
+            // logged but doesn't fail the whole refresh — the user can still
+            // create templates manually.
+            if loaded.isEmpty && !defaults.bool(forKey: Self.hasSeededSampleKey) {
+                let sample = FormTemplate.makeFreshSample()
+                do {
+                    let data = try Self.makeEncoder().encode(sample)
+                    _ = try await dropbox.saveTemplate(data, filename: Self.filename(for: sample))
+                    defaults.set(true, forKey: Self.hasSeededSampleKey)
+                    loaded.append(sample)
+                } catch {
+                    Self.logger.warning("Initial sample seed failed: \(error.localizedDescription, privacy: .private)")
+                }
+            }
+
+            templates = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             lastRefreshSkipCount = skipped
             loadState = .loaded
         } catch {
@@ -115,24 +126,25 @@ final class TemplateStore {
     /// by a concurrent `refresh()` — both methods are `@MainActor` so they
     /// can't interleave non-await turns, but the suspension point hands the
     /// run-loop back. We reconstruct the array from scratch instead of
-    /// patching by index, so the result is correct regardless of what
-    /// `refresh` did with the bundled-vs-user partitioning while we waited.
+    /// patching by index so the result is correct regardless of what
+    /// `refresh` may have done while we waited.
     func save(_ template: FormTemplate) async throws {
         guard template.editable else {
             throw StoreError.notEditable
         }
         let data = try Self.makeEncoder().encode(template)
         _ = try await dropbox.saveTemplate(data, filename: Self.filename(for: template))
-        let bundledIDs = Set(bundled.map(\.id))
-        var user = templates.filter { !bundledIDs.contains($0.id) && $0.id != template.id }
-        user.append(template)
-        templates = bundled + user.sorted {
+        var updated = templates.filter { $0.id != template.id }
+        updated.append(template)
+        templates = updated.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
-    /// Deletes a user-authored template from Dropbox and the local list.
-    /// Bundled templates are silently no-ops — the caller should hide the affordance.
+    /// Deletes a template from Dropbox and the local list. Non-editable
+    /// templates are silently no-ops (no current path produces one, but the
+    /// guard remains in case future code reintroduces bundled-immutable
+    /// content).
     func delete(_ template: FormTemplate) async throws {
         guard template.editable else { return }
         let path = "\(DropboxConfig.templatesFolder)/\(Self.filename(for: template))"
@@ -144,10 +156,12 @@ final class TemplateStore {
         case notEditable
         var errorDescription: String? {
             switch self {
-            case .notEditable: return "Bundled templates can't be edited."
+            case .notEditable: return "This template can't be edited."
             }
         }
     }
+
+    private static let hasSeededSampleKey = "hasSeededSample"
 
     private static func filename(for template: FormTemplate) -> String {
         "\(template.id.uuidString).json"
