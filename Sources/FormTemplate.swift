@@ -75,6 +75,17 @@ extension FormHeader {
 }
 
 extension FormTemplate {
+    /// Sentinel UUIDs for bundled templates. Held in a single place so
+    /// `TemplateStore` can reject any synced JSON whose id matches — a malicious
+    /// or accidentally-edited file on Dropbox can't impersonate a built-in.
+    /// Future bundled templates extend this set; user-authored templates use
+    /// `UUID()` and won't collide.
+    enum BundledID {
+        static let generalSafetyV1 = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+
+        static let all: Set<UUID> = [generalSafetyV1]
+    }
+
     /// Built-in General Safety Rules template — seeded from the original Word doc content.
     /// Phase 2 will let managers edit / replace this in-app.
     static let generalSafetyV1: FormTemplate = {
@@ -83,6 +94,7 @@ extension FormTemplate {
         let effective = calendar.date(from: DateComponents(year: 2026, month: 4, day: 22))!
 
         return FormTemplate(
+            id: BundledID.generalSafetyV1,
             name: "General Safety Rules",
             header: FormHeader(
                 company: "KwikShip, LLC",

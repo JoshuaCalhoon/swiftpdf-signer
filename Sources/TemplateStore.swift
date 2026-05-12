@@ -35,6 +35,10 @@ final class TemplateStore {
     /// Pulls the latest template set from Dropbox, decodes each, and rebuilds
     /// `templates` as [bundled, ...synced sorted-by-name]. A failure leaves the
     /// list intact at its last good state and surfaces a message via `loadState`.
+    ///
+    /// Any synced template whose `id` matches a bundled sentinel (see
+    /// `FormTemplate.BundledID`) is dropped — the in-app bundled copy is the
+    /// source of truth and a file on Dropbox can't override it.
     func refresh() async {
         loadState = .loading
         do {
@@ -44,6 +48,10 @@ final class TemplateStore {
                 do {
                     let data = try await dropbox.downloadTemplate(at: ref.path)
                     let decoded = try Self.decoder.decode(FormTemplate.self, from: data)
+                    if FormTemplate.BundledID.all.contains(decoded.id) {
+                        NSLog("[TemplateStore] rejected bundled-id impersonation: \(ref.name)")
+                        continue
+                    }
                     loaded.append(decoded)
                 } catch {
                     // One corrupt template shouldn't block the others.
