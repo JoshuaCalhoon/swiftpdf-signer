@@ -17,7 +17,7 @@ struct LibraryView: View {
     var body: some View {
         listView
             .listStyle(.insetGrouped)
-            .navigationTitle("SwiftPDF")
+            .navigationTitle("SwiftPDF Signer")
             .navigationDestination(for: FormTemplate.self) { template in
                 FormView(template: template)
             }
@@ -76,13 +76,19 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var toolbarMenu: some ToolbarContent {
+        // Settings gets its own toolbar button (not buried inside the menu)
+        // because it's the primary first-run customization surface — a
+        // manager finishing setup needs to find it without exploring.
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                Task { await trySettings() }
+            } label: {
+                Image(systemName: "gearshape")
+                    .accessibilityLabel("Settings")
+            }
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button {
-                    Task { await trySettings() }
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
                 Button(role: .destructive) {
                     Task { await tryDisconnect() }
                 } label: {

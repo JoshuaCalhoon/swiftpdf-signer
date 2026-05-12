@@ -70,7 +70,7 @@ final class TemplateStore {
                     group.addTask {
                         do {
                             let data = try await dropboxRef.downloadTemplate(at: ref.path)
-                            let decoded = try Self.decoder.decode(FormTemplate.self, from: data)
+                            let decoded = try Self.makeDecoder().decode(FormTemplate.self, from: data)
                             return (ref, .success(decoded))
                         } catch {
                             return (ref, .failure(error))
@@ -121,7 +121,7 @@ final class TemplateStore {
         guard template.editable else {
             throw StoreError.notEditable
         }
-        let data = try Self.encoder.encode(template)
+        let data = try Self.makeEncoder().encode(template)
         _ = try await dropbox.saveTemplate(data, filename: Self.filename(for: template))
         let bundledIDs = Set(bundled.map(\.id))
         var user = templates.filter { !bundledIDs.contains($0.id) && $0.id != template.id }
@@ -153,16 +153,22 @@ final class TemplateStore {
         "\(template.id.uuidString).json"
     }
 
-    private static let encoder: JSONEncoder = {
+    // Factory methods (not static lets) so they're `nonisolated` and can be
+    // called from inside the parallel-download task group without tripping
+    // Swift 6's actor isolation check. JSONEncoder/JSONDecoder are reference
+    // types and not Sendable — sharing one instance across concurrent tasks
+    // is unsafe anyway, so a fresh instance per call is the right model.
+    // Allocation is microsecond-cheap.
+    nonisolated private static func makeEncoder() -> JSONEncoder {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
         return e
-    }()
+    }
 
-    private static let decoder: JSONDecoder = {
+    nonisolated private static func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
-    }()
+    }
 }
