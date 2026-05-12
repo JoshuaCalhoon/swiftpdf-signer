@@ -249,7 +249,14 @@ struct FormRenderer {
         // `FormView.canSubmit` performs the same check at the UI layer.
         guard sourceBounds.width > 0.5, sourceBounds.height > 0.5 else { return }
 
-        let image = drawing.image(from: sourceBounds, scale: Self.signatureRenderScale)
+        // Pin a light trait collection while rasterizing. PKDrawing.image()
+        // resolves stroke colors against the current trait collection; in dark
+        // mode the `.black` ink comes out near-white and disappears on the PDF's
+        // white page — visible on the canvas (dark bg), gone in the export.
+        var image: UIImage!
+        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+            image = drawing.image(from: sourceBounds, scale: Self.signatureRenderScale)
+        }
         let aspect = sourceBounds.width / sourceBounds.height
         let availableAspect = rect.width / rect.height
         let target: CGRect
