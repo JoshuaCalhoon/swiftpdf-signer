@@ -22,18 +22,39 @@ final class DropboxService {
     }
 
     /// Routed from `App.onOpenURL` — completes the OAuth round-trip.
+    ///
+    /// Belt-and-suspenders scheme check before handing the URL to the SDK:
+    /// SwiftyDropbox's PKCE state validation is the actual security gate, but
+    /// rejecting the URL here means an unrelated deep link can never even
+    /// reach the SDK's callback, which keeps `.none` returns out of our state
+    /// machine entirely.
     func handleRedirect(_ url: URL) {
-        _ = DropboxClientsManager.handleRedirectURL(url, includeBackgroundClient: false) { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case .success:
-                authState = .authorized
-            case .cancel, .none:
-                authState = .notAuthorized
-            case .error(_, let description):
-                authState = .authFailed(message: description ?? "Authorization failed")
-            @unknown default:
-                authState = .notAuthorized
+        let expectedScheme = "db-\(DropboxConfig.appKey)"
+        guard url.scheme?.caseInsensitiveCompare(expectedScheme) == .orderedSame else { return }
+
+        _ = DropboxClientsManager.handleRedirectURL(url, includeBackgroundClient: false) { result in
+            // Hop explicitly onto MainActor — the SDK's callback contract
+            // doesn't statically promise main-queue delivery, and on Swift 6
+            // mode this would be an isolation violation.
+            Task { @MainActor in
+                switch result {
+                case .success:
+                    self.authState = .authorized
+                case .cancel:
+                    // User backed out of the OAuth screen. Reset to the
+                    // connect-prompt state.
+                    self.authState = .notAuthorized
+                case .none:
+                    // The SDK didn't recognize the URL (e.g. an unrelated
+                    // deep link). Leave authState untouched — we shouldn't
+                    // have gotten here given the scheme guard above, but
+                    // belt-and-suspenders.
+                    break
+                case .error(_, let description):
+                    self.authState = .authFailed(message: description ?? "Authorization failed")
+                @unknown default:
+                    break
+                }
             }
         }
     }
