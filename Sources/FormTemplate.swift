@@ -9,7 +9,7 @@ struct FormTemplate: Codable, Identifiable, Hashable {
     var content: FormContent
     var version: Int
 
-    /// Bundled templates (e.g. General Safety) ship in the app binary;
+    /// Bundled templates (e.g. the built-in sample) ship in the app binary;
     /// `editable == false` means the editor is read-only and Library hides delete.
     /// User-authored templates default to `true`.
     var editable: Bool
@@ -62,13 +62,14 @@ struct FormHeader: Codable, Hashable {
 }
 
 extension FormHeader {
-    /// Locked KwikShip header values reused for every manager-authored template.
-    /// `effectiveDate` defaults to the moment the template is created.
-    static func kwikshipStandard(effectiveDate: Date = Date()) -> FormHeader {
+    /// Default header values applied to every new template. Phase 2 moves these
+    /// into per-install `AppSettings` so a manager can fill them in once during
+    /// setup; until then they render as obvious placeholders.
+    static func placeholder(effectiveDate: Date = Date()) -> FormHeader {
         FormHeader(
-            company: "KwikShip, LLC",
-            location: "981 Industrial Park Road Columbia, TN 38401",
-            department: "Fulfillment / Distribution / Warehousing",
+            company: "Your Company",
+            location: "Your Location",
+            department: "Your Department",
             effectiveDate: effectiveDate
         )
     }
@@ -81,53 +82,34 @@ extension FormTemplate {
     /// Future bundled templates extend this set; user-authored templates use
     /// `UUID()` and won't collide.
     enum BundledID {
-        static let generalSafetyV1 = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+        static let sampleAcknowledgmentV1 = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
 
-        static let all: Set<UUID> = [generalSafetyV1]
+        static let all: Set<UUID> = [sampleAcknowledgmentV1]
     }
 
-    /// Built-in General Safety Rules template — seeded from the original Word doc content.
-    /// Phase 2 will let managers edit / replace this in-app.
-    static let generalSafetyV1: FormTemplate = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
-        // `calendar.date(from:)` can theoretically return nil for invalid
-        // components. The hardcoded values here are valid, so this is a
-        // shouldn't-happen path — but a future typo (`day: 32`) would crash
-        // at first access otherwise. Fall back to `Date()` to keep the app
-        // launchable; the rendered form's "Effective Date" will then read
-        // as today, which is loud enough that someone notices and fixes it.
-        let effective = calendar.date(from: DateComponents(year: 2026, month: 4, day: 22)) ?? Date()
-
+    /// Built-in sample template — a generic placeholder so the library has
+    /// something to show on first launch before a manager creates real templates.
+    /// `editable: false` keeps it visible as documentation; managers replace
+    /// it by tapping "New Template".
+    static let sampleAcknowledgmentV1: FormTemplate = {
         return FormTemplate(
-            id: BundledID.generalSafetyV1,
-            name: "General Safety Rules",
+            id: BundledID.sampleAcknowledgmentV1,
+            name: "Sample Acknowledgment Form",
             header: FormHeader(
-                company: "KwikShip, LLC",
-                location: "981 Industrial Park Road Columbia, TN 38401",
-                department: "Fulfillment / Distribution / Warehousing",
-                effectiveDate: effective
+                company: "Your Company",
+                location: "Your Location",
+                department: "Your Department",
+                effectiveDate: Date()
             ),
             content: .structured(
-                intro: "All employees, temporary workers, contractors, and visitors are expected to follow these general safety rules while on company property or performing work on behalf of KwikShip, LLC.",
+                intro: "This is a sample template demonstrating the structured form layout. To create your own form, tap New Template — or replace this template with one that fits your organization.",
                 rules: [
-                    "Follow all company safety rules, procedures, and posted instructions.",
-                    "Report all injuries, incidents, near misses, hazards, and unsafe conditions immediately.",
-                    "Stop work and ask for guidance if a task cannot be completed safely.",
-                    "Wear required PPE and use equipment only as trained and authorized.",
-                    "Keep work areas clean, organized, and free of slip, trip, and fire hazards.",
-                    "Keep aisles, exits, fire extinguishers, electrical panels, and emergency equipment clear at all times.",
-                    "Clean up spills promptly or report them immediately.",
-                    "Use safe lifting practices and get help when needed.",
-                    "Only trained and authorized employees may operate forklifts or other powered industrial trucks and must have a spotter when storing pallets in racks.",
-                    "Stay alert to moving equipment, pedestrians, dock areas, and material handling hazards.",
-                    "Do not remove guards, bypass safety devices, or use damaged tools or equipment.",
-                    "Horseplay, running, fighting, or other unsafe behavior is not permitted.",
-                    "Follow all emergency procedures, alarms, drills, and evacuation instructions.",
-                    "Know the location of emergency exits, first aid kits, and fire extinguishers in your work area.",
-                    "Safety is a shared responsibility, and all employees are expected to help maintain a safe workplace."
+                    "Sample rule one — replace this text with content relevant to your form.",
+                    "Sample rule two — rules render as a numbered list in the signed PDF.",
+                    "Sample rule three — keep rules concise; the renderer surfaces an error if content overflows the page.",
+                    "Sample rule four — add as many rules as your form requires."
                 ],
-                acknowledgment: "By signing below, I acknowledge that I have read, understand, and agree to comply with these General Safety Rules while on KwikShip, LLC property or performing work on behalf of KwikShip, LLC."
+                acknowledgment: "By signing below, I acknowledge that this is a sample form. Replace this template with one tailored to your organization before sharing it with signers."
             ),
             version: 1,
             editable: false

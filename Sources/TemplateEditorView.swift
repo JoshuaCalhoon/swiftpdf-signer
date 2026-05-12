@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Create-or-edit form for a `FormTemplate`. Passed `nil` to create; passed an
-/// existing template to edit. Header is locked to the KwikShip standard — the
-/// editor only exposes title + freeform body.
+/// existing template to edit. Header is locked to the placeholder defaults —
+/// the editor only exposes title + freeform body.
 struct TemplateEditorView: View {
     let template: FormTemplate?
 
@@ -45,7 +45,7 @@ struct TemplateEditorView: View {
             } header: {
                 Text("Header (locked)")
             } footer: {
-                Text("Company, location, and department come from the KwikShip standard. Effective date is set when the template is created.")
+                Text("Company, location, and department are filled with placeholder values for now. Effective date is set when the template is created.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -108,7 +108,7 @@ struct TemplateEditorView: View {
     }
 
     private var lockedHeaderPreview: some View {
-        let header = template?.header ?? FormHeader.kwikshipStandard()
+        let header = template?.header ?? FormHeader.placeholder()
         return VStack(alignment: .leading, spacing: 4) {
             row("Company", header.company)
             row("Location", header.location)
@@ -185,7 +185,7 @@ struct TemplateEditorView: View {
         } else {
             toSave = FormTemplate(
                 name: trimmedTitle,
-                header: .kwikshipStandard(),
+                header: .placeholder(),
                 content: .freeform(body: trimmedBody),
                 version: 1,
                 editable: true

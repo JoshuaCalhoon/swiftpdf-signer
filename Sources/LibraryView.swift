@@ -62,7 +62,7 @@ struct LibraryView: View {
                     showNewTemplate = true
                 } label: {
                     Label("New Template", systemImage: "plus.circle.fill")
-                        .foregroundStyle(Color.kwikshipOrange)
+                        .foregroundStyle(Color.brandAccent)
                         .font(.body.weight(.semibold))
                 }
             }
@@ -122,7 +122,7 @@ struct LibraryView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .tint(Color.kwikshipOrange)
+                .tint(Color.brandAccent)
             }
         }
     }

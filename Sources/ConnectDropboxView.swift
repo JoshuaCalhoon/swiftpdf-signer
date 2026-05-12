@@ -10,12 +10,12 @@ struct ConnectDropboxView: View {
 
             Image(systemName: "shippingbox.and.arrow.backward.fill")
                 .font(.system(size: 72))
-                .foregroundStyle(Color.kwikshipOrange)
+                .foregroundStyle(Color.brandAccent)
 
             VStack(spacing: 8) {
                 Text("Connect Dropbox")
                     .font(.largeTitle.bold())
-                Text("One-time setup per iPad. Signed forms upload to /Apps/SwiftPDF/Signed/ in your Dropbox.")
+                Text("One-time setup per iPad. Signed forms upload to your Dropbox app folder under /Apps.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 40)
@@ -40,7 +40,7 @@ struct ConnectDropboxView: View {
                     .frame(maxWidth: 360)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.kwikshipOrange)
+            .tint(Color.brandAccent)
             .controlSize(.large)
             .disabled(dropbox.authState == .authorizing)
             .padding(.bottom, 40)

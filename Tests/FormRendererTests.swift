@@ -11,7 +11,7 @@ final class FormRendererTests: XCTestCase {
     private func makeFreeform(_ body: String, name: String = "Test Form") -> FormTemplate {
         FormTemplate(
             name: name,
-            header: .kwikshipStandard(effectiveDate: signedAt),
+            header: .placeholder(effectiveDate: signedAt),
             content: .freeform(body: body),
             version: 1,
             editable: true

@@ -16,7 +16,7 @@ final class FormTemplateCodableTests: XCTestCase {
     }()
 
     func test_round_trips_freeform_template() throws {
-        let header = FormHeader.kwikshipStandard(effectiveDate: Date(timeIntervalSince1970: 1_700_000_000))
+        let header = FormHeader.placeholder(effectiveDate: Date(timeIntervalSince1970: 1_700_000_000))
         let template = FormTemplate(
             name: "Receiving Dock Acknowledgment",
             header: header,
@@ -37,7 +37,7 @@ final class FormTemplateCodableTests: XCTestCase {
     }
 
     func test_round_trips_structured_template() throws {
-        let template = FormTemplate.generalSafetyV1
+        let template = FormTemplate.sampleAcknowledgmentV1
         let data = try encoder.encode(template)
         let decoded = try decoder.decode(FormTemplate.self, from: data)
 
@@ -51,7 +51,7 @@ final class FormTemplateCodableTests: XCTestCase {
             XCTAssertFalse(rules.isEmpty)
             XCTAssertFalse(acknowledgment.isEmpty)
         case .freeform:
-            XCTFail("Expected structured content for generalSafetyV1")
+            XCTFail("Expected structured content for sampleAcknowledgmentV1")
         }
     }
 
@@ -63,9 +63,9 @@ final class FormTemplateCodableTests: XCTestCase {
           "id": "11111111-1111-4111-8111-111111111111",
           "name": "Manually Authored",
           "header": {
-            "company": "KwikShip, LLC",
-            "location": "TN",
-            "department": "Warehouse",
+            "company": "Test Company",
+            "location": "Test Location",
+            "department": "Test Department",
             "effectiveDate": "2026-05-11T00:00:00Z"
           },
           "content": {
@@ -85,9 +85,9 @@ final class FormTemplateCodableTests: XCTestCase {
         // CR-02: bundled UUIDs must be stable across launches.
         // The sentinel value is what TemplateStore.refresh checks against.
         XCTAssertEqual(
-            FormTemplate.generalSafetyV1.id,
-            FormTemplate.BundledID.generalSafetyV1
+            FormTemplate.sampleAcknowledgmentV1.id,
+            FormTemplate.BundledID.sampleAcknowledgmentV1
         )
-        XCTAssertTrue(FormTemplate.BundledID.all.contains(FormTemplate.generalSafetyV1.id))
+        XCTAssertTrue(FormTemplate.BundledID.all.contains(FormTemplate.sampleAcknowledgmentV1.id))
     }
 }

@@ -14,7 +14,10 @@ struct FormRenderer {
     /// signature box + signature line + a little breathing room).
     static let signatureBlockHeight: CGFloat = 150
 
-    static let kwikshipOrange = UIColor(red: 1.0, green: 0x51 / 255.0, blue: 0, alpha: 1.0)
+    /// Brand accent used for the title text. Phase 2 will inject this from
+    /// `AppSettings` so each install can pick its own color; for now it's the
+    /// system orange that matches `Color.brandAccent`.
+    static let brandAccent = UIColor.systemOrange
 
     enum RenderError: LocalizedError {
         case contentTooLong
@@ -27,14 +30,15 @@ struct FormRenderer {
         }
     }
 
-    /// Pinned to `en_US_POSIX` + Gregorian + America/Chicago so the in-PDF
-    /// "Date" field reads consistently regardless of the iPad's regional
-    /// settings, and matches the filename's date convention from `FormView`.
+    /// Pinned to `en_US_POSIX` + Gregorian so the in-PDF "Date" field always
+    /// reads as a Western Gregorian date regardless of the device's regional
+    /// settings. Time zone tracks the device's current zone so the date matches
+    /// the signer's local calendar day.
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
+        f.timeZone = .current
         f.dateFormat = "MMMM d, yyyy"
         return f
     }()
@@ -108,7 +112,7 @@ struct FormRenderer {
     private func drawTitle(_ title: String, at y: CGFloat) -> CGFloat {
         let attrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 28, weight: .bold),
-            .foregroundColor: Self.kwikshipOrange
+            .foregroundColor: Self.brandAccent
         ]
         NSAttributedString(string: title, attributes: attrs)
             .draw(at: CGPoint(x: Self.margin, y: y))

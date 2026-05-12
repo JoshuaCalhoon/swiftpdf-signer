@@ -3,8 +3,8 @@ import Observation
 import os
 
 /// Owns the list of templates shown in `LibraryView`.
-/// Merges the bundled built-ins (e.g. `FormTemplate.generalSafetyV1`) with
-/// user-authored templates synced from `/Apps/SwiftPDF/Templates/` in Dropbox.
+/// Merges the bundled built-ins (e.g. `FormTemplate.sampleAcknowledgmentV1`) with
+/// user-authored templates synced from the app's `/Templates/` folder in Dropbox.
 ///
 /// Bundled templates are always visible and aren't deletable.
 /// User templates have `editable == true` and are written as one JSON file per
@@ -21,7 +21,10 @@ final class TemplateStore {
     /// quietly-shorter list. Reset to zero at the top of each `refresh()`.
     private(set) var lastRefreshSkipCount: Int = 0
 
-    private static let logger = Logger(subsystem: "com.kwikship.swiftpdf", category: "TemplateStore")
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "swiftpdf",
+        category: "TemplateStore"
+    )
 
     enum LoadState: Equatable {
         case idle
@@ -31,7 +34,7 @@ final class TemplateStore {
     }
 
     private let dropbox: DropboxService
-    private let bundled: [FormTemplate] = [.generalSafetyV1]
+    private let bundled: [FormTemplate] = [.sampleAcknowledgmentV1]
 
     init(dropbox: DropboxService) {
         self.dropbox = dropbox

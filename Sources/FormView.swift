@@ -109,7 +109,7 @@ struct FormView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.kwikshipOrange)
+                .foregroundStyle(Color.brandAccent)
             Text("Signed and Saved")
                 .font(.title2.bold())
             Text(path)
@@ -129,7 +129,7 @@ struct FormView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.kwikshipOrange)
+            .tint(Color.brandAccent)
             .controlSize(.large)
             .padding(.top, 4)
         }
@@ -181,7 +181,7 @@ struct FormView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.kwikshipOrange)
+            .tint(Color.brandAccent)
             .controlSize(.large)
             .disabled(!canSubmit)
 
@@ -315,15 +315,16 @@ struct FormView: View {
         return "\(stem.truncatedToUTF8Bytes(240)).pdf"
     }
 
-    /// `en_US_POSIX` so the year is always Gregorian even if a customer has
-    /// switched the device into a non-Western locale. Pinned to America/Chicago
-    /// (KwikShip HQ) so the filename date doesn't shift around when the iPad
-    /// happens to be sitting in a different timezone than `signedAt: Date()`.
+    /// `en_US_POSIX` + Gregorian so the year is always Western even if the
+    /// device is set to a non-Western locale. Time zone tracks the device's
+    /// current zone so the filename date matches the signer's local calendar
+    /// day — a manager filing forms at 11pm local time sees today's date, not
+    /// tomorrow's UTC date.
     private static let filenameDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
+        f.timeZone = .current
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -336,7 +337,7 @@ struct TemplateBody: View {
         VStack(alignment: .leading, spacing: 20) {
             Text(template.name)
                 .font(.largeTitle.bold())
-                .foregroundStyle(Color.kwikshipOrange)
+                .foregroundStyle(Color.brandAccent)
 
             headerTable
 
