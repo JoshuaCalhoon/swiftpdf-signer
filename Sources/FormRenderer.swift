@@ -235,6 +235,11 @@ struct FormRenderer {
                  to: CGPoint(x: Self.pageSize.width - Self.margin, y: sigY + 84))
     }
 
+    /// 3x oversample so the signature ends up at roughly 216dpi inside the
+    /// 72dpi PDF page — enough resolution that the rasterized strokes don't
+    /// look pixelated when the form is printed.
+    private static let signatureRenderScale: CGFloat = 3.0
+
     private func drawSignature(_ drawing: PKDrawing, in rect: CGRect) {
         guard !drawing.strokes.isEmpty else { return }
         let sourceBounds = drawing.bounds
@@ -244,7 +249,7 @@ struct FormRenderer {
         // `FormView.canSubmit` performs the same check at the UI layer.
         guard sourceBounds.width > 0.5, sourceBounds.height > 0.5 else { return }
 
-        let image = drawing.image(from: sourceBounds, scale: 3.0)
+        let image = drawing.image(from: sourceBounds, scale: Self.signatureRenderScale)
         let aspect = sourceBounds.width / sourceBounds.height
         let availableAspect = rect.width / rect.height
         let target: CGRect

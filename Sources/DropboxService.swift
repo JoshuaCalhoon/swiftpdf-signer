@@ -61,6 +61,13 @@ final class DropboxService {
 
     /// Kicks off the in-app OAuth flow. Result arrives via `handleRedirect(_:)`.
     func authorize(from controller: UIViewController) {
+        // Release builds with a missing/placeholder app key reach here with an
+        // empty appKey (see `DropboxConfig.appKey`). Surface a clear error
+        // instead of letting SwiftyDropbox produce an opaque failure.
+        guard !DropboxConfig.appKey.isEmpty else {
+            authState = .authFailed(message: "App is misconfigured — Dropbox App Key is missing. Contact IT.")
+            return
+        }
         authState = .authorizing
         let scopeRequest = ScopeRequest(
             scopeType: .user,

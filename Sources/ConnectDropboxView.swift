@@ -65,7 +65,15 @@ struct ConnectDropboxView: View {
 }
 
 private extension UIViewController {
+    /// Walks the `presentedViewController` chain iteratively so we never blow
+    /// the stack on a pathological cycle. Cycles aren't supposed to be
+    /// reachable in UIKit, but iterative is the same number of lines and
+    /// resists future surprises.
     var topPresented: UIViewController {
-        presentedViewController?.topPresented ?? self
+        var current = self
+        while let next = current.presentedViewController {
+            current = next
+        }
+        return current
     }
 }

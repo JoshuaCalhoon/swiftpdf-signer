@@ -52,20 +52,45 @@ final class TemplateStore {
         var skipped = 0
         do {
             let refs = try await dropbox.listTemplates()
+
+            // Download + decode each template in parallel. At ~1 template
+            // today the wall-clock win is invisible; at 10+ it's seconds.
+            // Each task captures `ref` so we can blame the right file in the
+            // skip log, and returns a Result rather than throwing so a single
+            // corrupt JSON doesn't tear down sibling downloads.
+            let dropboxRef = self.dropbox
+            let outcomes = await withTaskGroup(
+                of: (DropboxService.TemplateRef, Result<FormTemplate, Error>).self,
+                returning: [(DropboxService.TemplateRef, Result<FormTemplate, Error>)].self
+            ) { group in
+                for ref in refs {
+                    group.addTask {
+                        do {
+                            let data = try await dropboxRef.downloadTemplate(at: ref.path)
+                            let decoded = try Self.decoder.decode(FormTemplate.self, from: data)
+                            return (ref, .success(decoded))
+                        } catch {
+                            return (ref, .failure(error))
+                        }
+                    }
+                }
+                var out: [(DropboxService.TemplateRef, Result<FormTemplate, Error>)] = []
+                for await item in group { out.append(item) }
+                return out
+            }
+
             var loaded: [FormTemplate] = []
-            for ref in refs {
-                do {
-                    let data = try await dropbox.downloadTemplate(at: ref.path)
-                    let decoded = try Self.decoder.decode(FormTemplate.self, from: data)
+            for (ref, result) in outcomes {
+                switch result {
+                case .success(let decoded):
                     if FormTemplate.BundledID.all.contains(decoded.id) {
                         Self.logger.warning("Rejected bundled-id impersonation in \(ref.name, privacy: .public)")
                         skipped += 1
                         continue
                     }
                     loaded.append(decoded)
-                } catch {
-                    // One corrupt template shouldn't block the others. Error
-                    // body is `.private` because `DecodingError.dataCorrupted`
+                case .failure(let error):
+                    // Error body is `.private` because `DecodingError.dataCorrupted`
                     // can quote source fragments — keep it out of Console logs.
                     Self.logger.warning("Skipped corrupt template \(ref.name, privacy: .public): \(error.localizedDescription, privacy: .private)")
                     skipped += 1

@@ -91,7 +91,13 @@ extension FormTemplate {
     static let generalSafetyV1: FormTemplate = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Chicago") ?? .current
-        let effective = calendar.date(from: DateComponents(year: 2026, month: 4, day: 22))!
+        // `calendar.date(from:)` can theoretically return nil for invalid
+        // components. The hardcoded values here are valid, so this is a
+        // shouldn't-happen path — but a future typo (`day: 32`) would crash
+        // at first access otherwise. Fall back to `Date()` to keep the app
+        // launchable; the rendered form's "Effective Date" will then read
+        // as today, which is loud enough that someone notices and fixes it.
+        let effective = calendar.date(from: DateComponents(year: 2026, month: 4, day: 22)) ?? Date()
 
         return FormTemplate(
             id: BundledID.generalSafetyV1,

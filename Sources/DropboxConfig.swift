@@ -10,6 +10,7 @@ enum DropboxConfig {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "DropboxAppKey") as? String,
               !raw.isEmpty,
               !raw.contains("REPLACE") else {
+            #if DEBUG
             fatalError(
                 """
                 Missing or placeholder Dropbox App Key.
@@ -18,6 +19,14 @@ enum DropboxConfig {
                 then re-run `xcodegen generate`.
                 """
             )
+            #else
+            // In a release build, returning "" lets the app launch and surface
+            // a user-visible "App misconfigured" message in
+            // `DropboxService.authorize` instead of crashing at the splash
+            // screen. Worse UX than fixing the build, better UX than a silent
+            // crash on a deployed iPad.
+            return ""
+            #endif
         }
         return raw
     }()
