@@ -5,6 +5,7 @@ struct FormView: View {
     let template: FormTemplate
 
     @Environment(DropboxService.self) private var dropbox
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var printName = ""
     @State private var signature = PKDrawing()
@@ -109,7 +110,7 @@ struct FormView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.brandAccent)
+                .foregroundStyle(settings.brandColor)
             Text("Signed and Saved")
                 .font(.title2.bold())
             Text(path)
@@ -129,7 +130,7 @@ struct FormView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.brandAccent)
+            .tint(settings.brandColor)
             .controlSize(.large)
             .padding(.top, 4)
         }
@@ -181,7 +182,7 @@ struct FormView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.brandAccent)
+            .tint(settings.brandColor)
             .controlSize(.large)
             .disabled(!canSubmit)
 
@@ -233,7 +234,7 @@ struct FormView: View {
         if let existing = pendingUpload {
             upload = existing
         } else {
-            let renderer = FormRenderer()
+            let renderer = FormRenderer(brandColor: settings.brandUIColor)
             let now = Date()
             do {
                 let pdfData = try renderer.render(
@@ -333,11 +334,13 @@ struct FormView: View {
 struct TemplateBody: View {
     let template: FormTemplate
 
+    @Environment(AppSettings.self) private var settings
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(template.name)
                 .font(.largeTitle.bold())
-                .foregroundStyle(Color.brandAccent)
+                .foregroundStyle(settings.brandColor)
 
             headerTable
 

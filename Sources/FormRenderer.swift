@@ -14,10 +14,14 @@ struct FormRenderer {
     /// signature box + signature line + a little breathing room).
     static let signatureBlockHeight: CGFloat = 150
 
-    /// Brand accent used for the title text. Phase 2 will inject this from
-    /// `AppSettings` so each install can pick its own color; for now it's the
-    /// system orange that matches `Color.brandAccent`.
-    static let brandAccent = UIColor.systemOrange
+    /// Brand accent used for the title text. Injected from `AppSettings` at
+    /// call sites; defaults to system orange so unit tests and any future
+    /// internal caller without settings access still render reasonably.
+    let brandColor: UIColor
+
+    init(brandColor: UIColor = AppSettings.defaultBrandUIColor) {
+        self.brandColor = brandColor
+    }
 
     enum RenderError: LocalizedError {
         case contentTooLong
@@ -112,7 +116,7 @@ struct FormRenderer {
     private func drawTitle(_ title: String, at y: CGFloat) -> CGFloat {
         let attrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 28, weight: .bold),
-            .foregroundColor: Self.brandAccent
+            .foregroundColor: brandColor
         ]
         NSAttributedString(string: title, attributes: attrs)
             .draw(at: CGPoint(x: Self.margin, y: y))

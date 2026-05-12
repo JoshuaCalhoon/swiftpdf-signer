@@ -20,4 +20,5 @@ struct ContentView: View {
     ContentView()
         .environment(dropbox)
         .environment(TemplateStore(dropbox: dropbox))
+        .environment(AppSettings())
 }

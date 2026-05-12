@@ -3,6 +3,7 @@ import UIKit
 
 struct ConnectDropboxView: View {
     @Environment(DropboxService.self) private var dropbox
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
         VStack(spacing: 24) {
@@ -10,7 +11,7 @@ struct ConnectDropboxView: View {
 
             Image(systemName: "shippingbox.and.arrow.backward.fill")
                 .font(.system(size: 72))
-                .foregroundStyle(Color.brandAccent)
+                .foregroundStyle(settings.brandColor)
 
             VStack(spacing: 8) {
                 Text("Connect Dropbox")
@@ -40,7 +41,7 @@ struct ConnectDropboxView: View {
                     .frame(maxWidth: 360)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.brandAccent)
+            .tint(settings.brandColor)
             .controlSize(.large)
             .disabled(dropbox.authState == .authorizing)
             .padding(.bottom, 40)

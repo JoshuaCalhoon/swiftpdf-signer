@@ -3,9 +3,11 @@ import SwiftUI
 struct LibraryView: View {
     @Environment(DropboxService.self) private var dropbox
     @Environment(TemplateStore.self) private var store
+    @Environment(AppSettings.self) private var settings
 
     @State private var showDisconnectConfirm = false
     @State private var showNewTemplate = false
+    @State private var showSettings = false
     @State private var editing: FormTemplate?
     @State private var deleting: FormTemplate?
     @State private var deleteError: String?
@@ -25,6 +27,9 @@ struct LibraryView: View {
             }
             .sheet(item: $editing) { template in
                 TemplateEditorView(template: template)
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .modifier(LibraryDialogs(
                 showDisconnectConfirm: $showDisconnectConfirm,
@@ -62,7 +67,7 @@ struct LibraryView: View {
                     showNewTemplate = true
                 } label: {
                     Label("New Template", systemImage: "plus.circle.fill")
-                        .foregroundStyle(Color.brandAccent)
+                        .foregroundStyle(settings.brandColor)
                         .font(.body.weight(.semibold))
                 }
             }
@@ -73,6 +78,11 @@ struct LibraryView: View {
     private var toolbarMenu: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button {
+                    Task { await trySettings() }
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
                 Button(role: .destructive) {
                     Task { await tryDisconnect() }
                 } label: {
@@ -82,6 +92,22 @@ struct LibraryView: View {
                 Image(systemName: "ellipsis.circle")
                     .accessibilityLabel("More options")
             }
+        }
+    }
+
+    /// Settings exposes the brand color picker (and future per-install knobs).
+    /// Gated by ManagerGate so a non-trusted customer can't reach the sheet
+    /// from a shared iPad.
+    private func trySettings() async {
+        switch await ManagerGate.require(reason: "Open Settings") {
+        case .authenticated:
+            showSettings = true
+        case .userCancelled:
+            break
+        case .notConfigured:
+            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+        case .failed(let message):
+            gateError = message
         }
     }
 
@@ -122,7 +148,7 @@ struct LibraryView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .tint(Color.brandAccent)
+                .tint(settings.brandColor)
             }
         }
     }
