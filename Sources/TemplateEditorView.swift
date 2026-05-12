@@ -7,6 +7,7 @@ struct TemplateEditorView: View {
     let template: FormTemplate?
 
     @Environment(TemplateStore.self) private var store
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String = ""
@@ -45,7 +46,7 @@ struct TemplateEditorView: View {
             } header: {
                 Text("Header (locked)")
             } footer: {
-                Text("Company, location, and department are filled with placeholder values for now. Effective date is set when the template is created.")
+                Text("Company, location, and department are pulled from Settings. Effective date is set when the template is created.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -108,7 +109,11 @@ struct TemplateEditorView: View {
     }
 
     private var lockedHeaderPreview: some View {
-        let header = template?.header ?? FormHeader.placeholder()
+        let header = template?.header ?? FormHeader.placeholder(
+            company: settings.companyName,
+            location: settings.companyLocation,
+            department: settings.companyDepartment
+        )
         return VStack(alignment: .leading, spacing: 4) {
             row("Company", header.company)
             row("Location", header.location)
@@ -185,7 +190,11 @@ struct TemplateEditorView: View {
         } else {
             toSave = FormTemplate(
                 name: trimmedTitle,
-                header: .placeholder(),
+                header: .placeholder(
+                    company: settings.companyName,
+                    location: settings.companyLocation,
+                    department: settings.companyDepartment
+                ),
                 content: .freeform(body: trimmedBody),
                 version: 1,
                 editable: true

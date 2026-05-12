@@ -62,16 +62,30 @@ struct FormHeader: Codable, Hashable {
 }
 
 extension FormHeader {
-    /// Default header values applied to every new template. Phase 2 moves these
-    /// into per-install `AppSettings` so a manager can fill them in once during
-    /// setup; until then they render as obvious placeholders.
-    static func placeholder(effectiveDate: Date = Date()) -> FormHeader {
+    /// Default header values for a newly-created template. Each field can be
+    /// overridden — callers pass in values from `AppSettings` so a manager's
+    /// configured company/location/department flow through to new templates.
+    /// Empty / whitespace-only overrides fall back to the placeholder so a
+    /// fresh install still shows something sensible before settings are
+    /// configured.
+    static func placeholder(
+        effectiveDate: Date = Date(),
+        company: String? = nil,
+        location: String? = nil,
+        department: String? = nil
+    ) -> FormHeader {
         FormHeader(
-            company: "Your Company",
-            location: "Your Location",
-            department: "Your Department",
+            company: nonEmpty(company) ?? "Your Company",
+            location: nonEmpty(location) ?? "Your Location",
+            department: nonEmpty(department) ?? "Your Department",
             effectiveDate: effectiveDate
         )
+    }
+
+    private static func nonEmpty(_ s: String?) -> String? {
+        guard let trimmed = s?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 }
 

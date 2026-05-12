@@ -47,6 +47,49 @@ final class AppSettingsTests: XCTestCase {
     }
 
     @MainActor
+    func test_company_fields_default_to_empty() {
+        let settings = AppSettings(defaults: freshDefaults())
+        XCTAssertEqual(settings.companyName, "")
+        XCTAssertEqual(settings.companyLocation, "")
+        XCTAssertEqual(settings.companyDepartment, "")
+    }
+
+    @MainActor
+    func test_company_fields_persist() {
+        let defaults = freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.companyName = "Acme Corp"
+        settings.companyLocation = "123 Main St"
+        settings.companyDepartment = "Receiving"
+
+        XCTAssertEqual(defaults.string(forKey: "companyName"), "Acme Corp")
+        XCTAssertEqual(defaults.string(forKey: "companyLocation"), "123 Main St")
+        XCTAssertEqual(defaults.string(forKey: "companyDepartment"), "Receiving")
+    }
+
+    func test_placeholder_falls_back_when_empty() {
+        let header = FormHeader.placeholder(
+            company: "",
+            location: "   ",
+            department: nil
+        )
+        XCTAssertEqual(header.company, "Your Company")
+        XCTAssertEqual(header.location, "Your Location")
+        XCTAssertEqual(header.department, "Your Department")
+    }
+
+    func test_placeholder_uses_overrides_when_present() {
+        let header = FormHeader.placeholder(
+            company: "Acme Corp",
+            location: "  123 Main St  ",
+            department: "Receiving"
+        )
+        XCTAssertEqual(header.company, "Acme Corp")
+        XCTAssertEqual(header.location, "123 Main St", "leading/trailing whitespace should trim")
+        XCTAssertEqual(header.department, "Receiving")
+    }
+
+    @MainActor
     func test_color_round_trips_through_hex() {
         // ColorPicker → Color.toHex → UserDefaults → UIColor(hex:) round-trip
         // should preserve the 8-bit-per-channel value.

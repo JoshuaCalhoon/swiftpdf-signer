@@ -20,14 +20,41 @@ final class AppSettings {
         }
     }
 
+    /// Header default values for newly-created templates. Empty strings fall
+    /// back to "Your Company / Your Location / Your Department" placeholders
+    /// at render time, so a fresh install still shows something sensible
+    /// before a manager configures real values.
+    var companyName: String {
+        didSet {
+            guard companyName != oldValue else { return }
+            defaults.set(companyName, forKey: Self.companyNameKey)
+        }
+    }
+
+    var companyLocation: String {
+        didSet {
+            guard companyLocation != oldValue else { return }
+            defaults.set(companyLocation, forKey: Self.companyLocationKey)
+        }
+    }
+
+    var companyDepartment: String {
+        didSet {
+            guard companyDepartment != oldValue else { return }
+            defaults.set(companyDepartment, forKey: Self.companyDepartmentKey)
+        }
+    }
+
     private let defaults: UserDefaults
 
     /// `defaults` is injectable so tests can use an in-memory suite instead
     /// of polluting `.standard` across the simulator.
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let stored = defaults.string(forKey: Self.brandColorKey)
-        self.brandColorHex = stored ?? Self.defaultBrandColorHex
+        self.brandColorHex = defaults.string(forKey: Self.brandColorKey) ?? Self.defaultBrandColorHex
+        self.companyName = defaults.string(forKey: Self.companyNameKey) ?? ""
+        self.companyLocation = defaults.string(forKey: Self.companyLocationKey) ?? ""
+        self.companyDepartment = defaults.string(forKey: Self.companyDepartmentKey) ?? ""
     }
 
     /// SwiftUI consumers. Falls back to `defaultBrandColor` if the stored hex
@@ -49,6 +76,9 @@ final class AppSettings {
     }
 
     private static let brandColorKey = "brandColorHex"
+    private static let companyNameKey = "companyName"
+    private static let companyLocationKey = "companyLocation"
+    private static let companyDepartmentKey = "companyDepartment"
     /// Matches `UIColor.systemOrange` resolved against a light trait collection
     /// (the way it'll render in the PDF). SwiftUI's `Color.orange` resolves to
     /// the same RGB so the in-app surface matches the PDF output.

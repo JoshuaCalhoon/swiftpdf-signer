@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Manager-facing settings sheet. Entry point is gated by `ManagerGate` from
-/// `LibraryView`'s toolbar menu, so a customer signing on a shared iPad can't
+/// `LibraryView`'s toolbar, so a customer signing on a shared iPad can't
 /// reach this surface without manager authentication.
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
@@ -14,8 +14,16 @@ struct SettingsView: View {
     @State private var workingColor: Color = AppSettings.defaultBrandColor
 
     var body: some View {
+        // Local @Bindable shadow so we can derive bindings ($settings.foo)
+        // from an Environment-injected @Observable. The shadow is scoped to
+        // this view's body — the actual state lives in the env-injected
+        // instance.
+        @Bindable var settings = settings
+
         NavigationStack {
             Form {
+                preview
+
                 Section {
                     ColorPicker("Accent color", selection: $workingColor, supportsOpacity: false)
                 } header: {
@@ -27,7 +35,22 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button("Reset to default") {
+                    TextField("Company", text: $settings.companyName)
+                        .textInputAutocapitalization(.words)
+                    TextField("Location", text: $settings.companyLocation)
+                        .textInputAutocapitalization(.words)
+                    TextField("Department", text: $settings.companyDepartment)
+                        .textInputAutocapitalization(.words)
+                } header: {
+                    Text("Form Header Defaults")
+                } footer: {
+                    Text("Used for the company / location / department fields at the top of every newly-created template. Leave blank to keep the generic placeholders.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button("Reset brand color") {
                         settings.resetBrandColor()
                         workingColor = settings.brandColor
                     }
@@ -51,6 +74,30 @@ struct SettingsView: View {
                 }
                 settings.brandColorHex = hex
             }
+        }
+    }
+
+    /// Inline sample of the brand color applied to a title and a button, so
+    /// the manager can see the effect of the picker without dismissing the
+    /// sheet to check.
+    private var preview: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Sample Form Title")
+                    .font(.title2.bold())
+                    .foregroundStyle(settings.brandColor)
+                Button {} label: {
+                    Text("Sample Button")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(settings.brandColor)
+                .controlSize(.large)
+                .allowsHitTesting(false)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Preview")
         }
     }
 }
