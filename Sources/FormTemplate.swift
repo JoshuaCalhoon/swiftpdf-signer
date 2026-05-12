@@ -52,6 +52,30 @@ struct FormTemplate: Codable, Identifiable, Hashable {
 enum FormContent: Codable, Hashable {
     case structured(intro: String, rules: [String], acknowledgment: String)
     case freeform(body: String)
+
+    /// Returns the content as a single freeform body. Structured content is
+    /// flattened with intro, numbered rules, and acknowledgment separated by
+    /// blank lines so the visual structure survives the conversion. Used when
+    /// a manager opens a structured template in the editor (which only
+    /// handles freeform) or duplicates one — they get an editable
+    /// representation instead of a copy they can't modify.
+    func flattenedToFreeform() -> String {
+        switch self {
+        case .freeform(let body):
+            return body
+        case .structured(let intro, let rules, let acknowledgment):
+            var parts: [String] = []
+            if !intro.isEmpty { parts.append(intro) }
+            if !rules.isEmpty {
+                let numbered = rules.enumerated()
+                    .map { "\($0.offset + 1). \($0.element)" }
+                    .joined(separator: "\n")
+                parts.append(numbered)
+            }
+            if !acknowledgment.isEmpty { parts.append(acknowledgment) }
+            return parts.joined(separator: "\n\n")
+        }
+    }
 }
 
 struct FormHeader: Codable, Hashable {

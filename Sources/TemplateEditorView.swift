@@ -154,17 +154,12 @@ struct TemplateEditorView: View {
     private func prefill() {
         guard let template, title.isEmpty, bodyText.isEmpty else { return }
         title = template.name
-        switch template.content {
-        case .freeform(let existingBody):
-            bodyText = existingBody
-        case .structured:
-            // The editor only knows how to round-trip freeform content. Saving
-            // a structured template here would silently flatten it into
-            // `.freeform(body: "")` — data loss. The Library swipe action is
-            // already gated to freeform templates only; this assertion catches
-            // any future code path that bypasses that gate.
-            assertionFailure("TemplateEditorView opened with a structured template — caller must gate on `.freeform` content")
-        }
+        // The editor only round-trips freeform content. Structured templates
+        // (today only the bundled sample) flatten to a freeform body that
+        // preserves the visible structure: intro / numbered rules /
+        // acknowledgment separated by blank lines. The manager edits this
+        // text and saves; the result is always freeform on the way out.
+        bodyText = template.content.flattenedToFreeform()
         // Snapshot the prefill values so `hasUnsavedChanges` knows the baseline.
         initialTitle = title
         initialBody = bodyText

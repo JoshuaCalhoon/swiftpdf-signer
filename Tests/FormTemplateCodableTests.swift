@@ -88,4 +88,36 @@ final class FormTemplateCodableTests: XCTestCase {
         XCTAssertTrue(decoded.editable, "Missing `editable` key should default to true")
     }
 
+    func test_flatten_freeform_returns_body_unchanged() {
+        let content = FormContent.freeform(body: "Hello\n\nWorld")
+        XCTAssertEqual(content.flattenedToFreeform(), "Hello\n\nWorld")
+    }
+
+    func test_flatten_structured_preserves_visible_structure() {
+        let content = FormContent.structured(
+            intro: "Read carefully.",
+            rules: ["First rule.", "Second rule."],
+            acknowledgment: "I acknowledge."
+        )
+        let expected = """
+        Read carefully.
+
+        1. First rule.
+        2. Second rule.
+
+        I acknowledge.
+        """
+        XCTAssertEqual(content.flattenedToFreeform(), expected)
+    }
+
+    func test_flatten_structured_omits_empty_sections() {
+        // Only rules — no intro or acknowledgment. Output shouldn't have
+        // leading/trailing blank lines from omitted sections.
+        let content = FormContent.structured(
+            intro: "",
+            rules: ["Lone rule."],
+            acknowledgment: ""
+        )
+        XCTAssertEqual(content.flattenedToFreeform(), "1. Lone rule.")
+    }
 }

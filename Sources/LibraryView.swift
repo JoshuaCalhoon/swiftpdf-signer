@@ -37,7 +37,15 @@ struct LibraryView: View {
                 deleting: $deleting,
                 actionError: $actionError,
                 gateError: $gateError,
-                onDisconnect: { dropbox.unauthorize() },
+                onDisconnect: {
+                    dropbox.unauthorize()
+                    // Wipe the seed flag too — a "start over" disconnect should
+                    // re-seed the sample if the next account's templates folder
+                    // is empty. Without this, a manager who clears their
+                    // Dropbox /Apps/.../Templates folder and reconnects sees an
+                    // empty library forever.
+                    store.resetSeedFlag()
+                },
                 onConfirmDelete: { template in
                     Task { await performDelete(template) }
                 }
@@ -55,7 +63,7 @@ struct LibraryView: View {
                             template: template,
                             brandColor: settings.brandColor,
                             inFlight: inFlightActions.contains(template.id),
-                            onEdit: editAction(for: template),
+                            onEdit: { editing = template },
                             onDuplicate: { Task { await duplicate(template) } },
                             onDelete: { deleting = template }
                         )
@@ -69,7 +77,22 @@ struct LibraryView: View {
                     }
                 }
             } header: {
-                Text("Templates")
+                // Manage lives inside the section header (not the app
+                // toolbar) so it's clearly scoped to "manage these
+                // templates" rather than "manage the app." textCase(nil)
+                // overrides the inset-grouped uppercase styling for the
+                // button label.
+                HStack {
+                    Text("Templates")
+                    Spacer()
+                    if !store.templates.isEmpty {
+                        Button(isManaging ? "Done" : "Manage") {
+                            isManaging.toggle()
+                        }
+                        .textCase(nil)
+                        .fontWeight(isManaging ? .semibold : .regular)
+                    }
+                }
             } footer: {
                 footer
             }
@@ -88,15 +111,6 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var toolbarMenu: some ToolbarContent {
-        // "Manage" exposes Edit / Duplicate / Delete affordances inline on
-        // each row. The swipe-actions in normal mode still work, but Manage
-        // makes them discoverable for managers who don't know to swipe.
-        ToolbarItem(placement: .topBarLeading) {
-            Button(isManaging ? "Done" : "Manage") {
-                isManaging.toggle()
-            }
-            .fontWeight(isManaging ? .semibold : .regular)
-        }
         // Settings gets its own toolbar button (not buried inside the menu)
         // because it's the primary first-run customization surface — a
         // manager finishing setup needs to find it without exploring.
@@ -120,14 +134,6 @@ struct LibraryView: View {
                     .accessibilityLabel("More options")
             }
         }
-    }
-
-    /// Edit is only safe for freeform content — the editor doesn't know how to
-    /// round-trip `.structured(...)` and would flatten it on save. Returns nil
-    /// for structured templates so the Manage row hides the Edit button.
-    private func editAction(for template: FormTemplate) -> (() -> Void)? {
-        guard case .freeform = template.content else { return nil }
-        return { editing = template }
     }
 
     /// Settings exposes the brand color picker (and future per-install knobs).
@@ -175,14 +181,16 @@ struct LibraryView: View {
             // produces a misleading "couldn't delete" alert for a delete that
             // already succeeded).
             .disabled(inFlightActions.contains(template.id))
-            if case .freeform = template.content {
-                Button {
-                    editing = template
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                .tint(settings.brandColor)
+            // Edit available for all editable templates — the editor flattens
+            // structured content (today only the bundled sample) to freeform
+            // on prefill, so a manager opening a structured template gets an
+            // editable text block instead of an empty editor.
+            Button {
+                editing = template
+            } label: {
+                Label("Edit", systemImage: "pencil")
             }
+            .tint(settings.brandColor)
         }
     }
 
@@ -227,13 +235,16 @@ struct LibraryView: View {
     /// Creates a copy of `template` with a fresh UUID and " copy" suffix on
     /// the name. Saving routes through TemplateStore.save → Dropbox upload,
     /// so the new template syncs back through refresh just like any other.
+    /// Structured content (today only the bundled sample) is flattened to
+    /// freeform on duplicate — otherwise the copy wouldn't be editable in
+    /// TemplateEditorView, which only round-trips freeform.
     private func duplicate(_ template: FormTemplate) async {
         inFlightActions.insert(template.id)
         defer { inFlightActions.remove(template.id) }
         let copy = FormTemplate(
             name: "\(template.name) copy",
             header: template.header,
-            content: template.content,
+            content: .freeform(body: template.content.flattenedToFreeform()),
             version: 1,
             editable: true
         )
@@ -324,13 +335,14 @@ private struct TemplateRow: View {
 
 /// Row used while the library is in Manage mode — exposes Edit / Duplicate /
 /// Delete buttons inline so a manager doesn't have to know about the swipe
-/// gesture to discover them. `onEdit == nil` hides the Edit button for
-/// structured templates that the editor can't round-trip.
+/// gesture to discover them. Edit is available for every editable template;
+/// the editor flattens structured content to freeform on prefill so the
+/// bundled sample (and any future structured template) is editable too.
 private struct ManageRow: View {
     let template: FormTemplate
     let brandColor: Color
     let inFlight: Bool
-    let onEdit: (() -> Void)?
+    let onEdit: () -> Void
     let onDuplicate: () -> Void
     let onDelete: () -> Void
 
@@ -345,16 +357,14 @@ private struct ManageRow: View {
             }
             Spacer()
             HStack(spacing: 8) {
-                if let onEdit {
-                    Button(action: onEdit) {
-                        Image(systemName: "pencil")
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(brandColor)
-                    .accessibilityLabel("Edit")
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .frame(width: 20, height: 20)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(brandColor)
+                .accessibilityLabel("Edit")
                 Button(action: onDuplicate) {
                     Image(systemName: "doc.on.doc")
                         .frame(width: 20, height: 20)

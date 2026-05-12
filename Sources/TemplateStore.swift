@@ -152,6 +152,15 @@ final class TemplateStore {
         templates.removeAll { $0.id == template.id }
     }
 
+    /// Clears the first-run seed flag so the next `refresh()` on an empty
+    /// Dropbox folder will re-seed the sample. Called when the user
+    /// disconnects Dropbox (a deliberate "start over" gesture) — without
+    /// this, reconnecting to a fresh / wiped Dropbox account leaves the
+    /// library empty because the flag thinks we've already seeded once.
+    func resetSeedFlag() {
+        defaults.removeObject(forKey: Self.hasSeededSampleKey)
+    }
+
     enum StoreError: LocalizedError {
         case notEditable
         var errorDescription: String? {
