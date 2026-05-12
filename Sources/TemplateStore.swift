@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// Owns the list of templates shown in `LibraryView`.
 /// Merges the bundled built-ins (e.g. `FormTemplate.generalSafetyV1`) with
@@ -14,6 +15,13 @@ import Observation
 final class TemplateStore {
     private(set) var templates: [FormTemplate]
     private(set) var loadState: LoadState = .idle
+    /// Number of templates the most recent `refresh()` had to skip — either
+    /// corrupt JSON or bundled-id impersonation attempts. Surfaced in
+    /// `LibraryView`'s footer so the manager isn't left guessing about a
+    /// quietly-shorter list. Reset to zero at the top of each `refresh()`.
+    private(set) var lastRefreshSkipCount: Int = 0
+
+    private static let logger = Logger(subsystem: "com.kwikship.swiftpdf", category: "TemplateStore")
 
     enum LoadState: Equatable {
         case idle
@@ -41,6 +49,7 @@ final class TemplateStore {
     /// source of truth and a file on Dropbox can't override it.
     func refresh() async {
         loadState = .loading
+        var skipped = 0
         do {
             let refs = try await dropbox.listTemplates()
             var loaded: [FormTemplate] = []
@@ -49,18 +58,24 @@ final class TemplateStore {
                     let data = try await dropbox.downloadTemplate(at: ref.path)
                     let decoded = try Self.decoder.decode(FormTemplate.self, from: data)
                     if FormTemplate.BundledID.all.contains(decoded.id) {
-                        NSLog("[TemplateStore] rejected bundled-id impersonation: \(ref.name)")
+                        Self.logger.warning("Rejected bundled-id impersonation in \(ref.name, privacy: .public)")
+                        skipped += 1
                         continue
                     }
                     loaded.append(decoded)
                 } catch {
-                    // One corrupt template shouldn't block the others.
-                    NSLog("[TemplateStore] skipped \(ref.name): \(error)")
+                    // One corrupt template shouldn't block the others. Error
+                    // body is `.private` because `DecodingError.dataCorrupted`
+                    // can quote source fragments — keep it out of Console logs.
+                    Self.logger.warning("Skipped corrupt template \(ref.name, privacy: .public): \(error.localizedDescription, privacy: .private)")
+                    skipped += 1
                 }
             }
             templates = bundled + loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            lastRefreshSkipCount = skipped
             loadState = .loaded
         } catch {
+            lastRefreshSkipCount = skipped
             loadState = .failed(message: error.localizedDescription)
         }
     }

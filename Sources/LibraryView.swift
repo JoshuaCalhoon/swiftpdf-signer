@@ -130,8 +130,17 @@ struct LibraryView: View {
     @ViewBuilder
     private var footer: some View {
         switch store.loadState {
-        case .idle, .loaded:
+        case .idle:
             EmptyView()
+        case .loaded:
+            if store.lastRefreshSkipCount > 0 {
+                let count = store.lastRefreshSkipCount
+                Label("Skipped \(count) template\(count == 1 ? "" : "s") that couldn't be loaded. Check Dropbox for corrupt JSON.", systemImage: "exclamationmark.bubble.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                EmptyView()
+            }
         case .loading:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
