@@ -189,8 +189,9 @@
       <p><strong>None, directly.</strong> SwiftPDF Signer is a client-only app. Bar-All IT operates no servers in connection with this app, stores no user data on infrastructure we control, and integrates no analytics, crash reporters, marketing pixels, or advertising SDKs.</p>
       <p>The only data the app stores locally on your device:</p>
       <ul>
-        <li>Brand color, header defaults, and an optional company logo you set in Settings (stored in iOS UserDefaults on your device only)</li>
-        <li>A Dropbox OAuth refresh token (stored in the iOS Keychain on your device only)</li>
+        <li>Brand color and header defaults (Your Company, Your Location, Your Department) you set in Settings, stored in iOS UserDefaults on your device only</li>
+        <li>An optional company logo you set in Settings, stored as a JPEG file in the app's Documents folder on your device only and marked excluded from iOS and iCloud backups so the bytes are not silently exfiltrated through device backup</li>
+        <li>A Dropbox OAuth refresh token, stored in the iOS Keychain on your device only</li>
         <li>A flag indicating whether the first-run sample template has been seeded</li>
       </ul>
       <p>This data never leaves your device except via the Dropbox integration described below.</p>

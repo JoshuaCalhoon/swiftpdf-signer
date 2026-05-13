@@ -13,6 +13,13 @@ final class AppSettingsTests: XCTestCase {
         return defaults
     }
 
+    /// Per-test logo URL in the simulator temp directory so logo tests don't
+    /// pollute the real Documents folder or contend with each other.
+    private func freshLogoURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppSettingsTests-\(UUID().uuidString).jpg")
+    }
+
     @MainActor
     func test_default_brand_color_when_no_value_stored() {
         let settings = AppSettings(defaults: freshDefaults())
@@ -90,10 +97,14 @@ final class AppSettingsTests: XCTestCase {
     }
 
     @MainActor
-    func test_logo_persists_and_loads() {
+    func test_logo_persists_to_file_and_loads() {
         let defaults = freshDefaults()
-        let settings = AppSettings(defaults: defaults)
-        XCTAssertNil(settings.companyLogo, "Fresh defaults have no logo")
+        let logoURL = freshLogoURL()
+        defer { try? FileManager.default.removeItem(at: logoURL) }
+
+        let settings = AppSettings(defaults: defaults, logoFileURL: logoURL)
+        XCTAssertNil(settings.companyLogo, "Fresh install has no logo")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: logoURL.path), "No file before any logo set")
 
         // Fabricate a 100x60 red image, compress, persist.
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 60))
@@ -105,23 +116,66 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertNotNil(compressed)
         settings.companyLogoData = compressed
 
-        XCTAssertNotNil(defaults.data(forKey: "companyLogoData"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logoURL.path), "Setter writes to the injected file URL")
+        XCTAssertNil(defaults.data(forKey: "companyLogoData"), "No UserDefaults write — file is the only persistence")
 
-        // Reload from defaults — second AppSettings instance should see the
-        // same bytes and decode them to a UIImage.
-        let reloaded = AppSettings(defaults: defaults)
+        // Reload from disk — a second AppSettings instance pointing at the
+        // same URL should see the same bytes and decode them to a UIImage.
+        let reloaded = AppSettings(defaults: defaults, logoFileURL: logoURL)
         XCTAssertNotNil(reloaded.companyLogo)
+        XCTAssertEqual(reloaded.companyLogoData, compressed)
     }
 
     @MainActor
-    func test_logo_clear_removes_key() {
+    func test_logo_clear_removes_file() {
         let defaults = freshDefaults()
-        let settings = AppSettings(defaults: defaults)
-        settings.companyLogoData = Data([0xFF, 0xD8, 0xFF])  // doesn't decode as image, fine for round-trip
-        XCTAssertNotNil(defaults.data(forKey: "companyLogoData"))
+        let logoURL = freshLogoURL()
+        defer { try? FileManager.default.removeItem(at: logoURL) }
+
+        let settings = AppSettings(defaults: defaults, logoFileURL: logoURL)
+        settings.companyLogoData = Data([0xFF, 0xD8, 0xFF])  // bytes round-trip; not required to decode
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logoURL.path))
 
         settings.companyLogoData = nil
-        XCTAssertNil(defaults.data(forKey: "companyLogoData"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: logoURL.path))
+    }
+
+    @MainActor
+    func test_logo_migrates_from_user_defaults_to_file() {
+        let defaults = freshDefaults()
+        let logoURL = freshLogoURL()
+        defer { try? FileManager.default.removeItem(at: logoURL) }
+
+        // Pre-populate the legacy UserDefaults blob to simulate an
+        // installation upgraded from the pre-file-storage version.
+        let legacyBlob = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
+        defaults.set(legacyBlob, forKey: "companyLogoData")
+
+        let settings = AppSettings(defaults: defaults, logoFileURL: logoURL)
+
+        XCTAssertEqual(settings.companyLogoData, legacyBlob, "Logo loaded from migrated file")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logoURL.path), "Migration wrote the file")
+        XCTAssertNil(defaults.data(forKey: "companyLogoData"), "Legacy UserDefaults key removed after migration")
+    }
+
+    @MainActor
+    func test_logo_migration_is_idempotent_on_second_init() {
+        let defaults = freshDefaults()
+        let logoURL = freshLogoURL()
+        defer { try? FileManager.default.removeItem(at: logoURL) }
+
+        // First init migrates the legacy blob.
+        let originalBlob = Data([0xFF, 0xD8, 0xFF])
+        defaults.set(originalBlob, forKey: "companyLogoData")
+        _ = AppSettings(defaults: defaults, logoFileURL: logoURL)
+
+        // Simulate a hostile retry — someone re-adds a different blob to
+        // UserDefaults after migration completed. The file already exists,
+        // so the next init MUST NOT overwrite it from UserDefaults.
+        defaults.set(Data([0xAA, 0xBB]), forKey: "companyLogoData")
+        let settings2 = AppSettings(defaults: defaults, logoFileURL: logoURL)
+
+        XCTAssertEqual(settings2.companyLogoData, originalBlob, "Second init reads from file, ignores re-added legacy blob")
     }
 
     func test_compress_logo_shrinks_oversized_image() {

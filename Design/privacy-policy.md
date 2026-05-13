@@ -12,8 +12,9 @@ SwiftPDF Signer is an iOS app that lets you fill in and sign PDF forms on your i
 
 The only data the app stores locally on your device:
 
-- Brand color, header defaults, and an optional company logo you set in Settings (stored in iOS UserDefaults on your device only)
-- A Dropbox OAuth refresh token (stored in the iOS Keychain on your device only)
+- Brand color and header defaults (Your Company, Your Location, Your Department) you set in Settings, stored in iOS UserDefaults on your device only
+- An optional company logo you set in Settings, stored as a JPEG file in the app's Documents folder on your device only and marked excluded from iOS and iCloud backups so the bytes are not silently exfiltrated through device backup
+- A Dropbox OAuth refresh token, stored in the iOS Keychain on your device only
 - A flag indicating whether the first-run sample template has been seeded
 
 This data never leaves your device except via the Dropbox integration described below.

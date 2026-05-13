@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import os
 
 /// Per-install configurable settings, persisted to `UserDefaults` and surfaced
 /// through `SettingsView` (gated by `ManagerGate`).
@@ -45,32 +46,107 @@ final class AppSettings {
         }
     }
 
-    /// JPEG-encoded company logo, stored directly in `UserDefaults`. The
-    /// setter expects already-compressed bytes — callers should run images
-    /// through `compressLogoForStorage(_:)` first so a multi-megabyte
-    /// `PhotosPicker` payload doesn't end up in the plist.
+    /// JPEG-encoded company logo. In-memory mirror of an on-disk file at
+    /// `Documents/companyLogo.jpg` with `NSURLIsExcludedFromBackupKey` set —
+    /// the bytes are kept out of iOS and iCloud backups so a company logo
+    /// (which the privacy policy promises doesn't get uploaded anywhere)
+    /// isn't silently exfiltrated via the user's iCloud account. The setter
+    /// expects already-compressed bytes — callers should run images through
+    /// `compressLogoForStorage(_:)` first so a multi-megabyte `PhotosPicker`
+    /// payload doesn't end up on disk.
     var companyLogoData: Data? {
         didSet {
             guard companyLogoData != oldValue else { return }
-            if let data = companyLogoData {
-                defaults.set(data, forKey: Self.companyLogoKey)
-            } else {
-                defaults.removeObject(forKey: Self.companyLogoKey)
-            }
+            persistLogo(companyLogoData)
         }
     }
 
     private let defaults: UserDefaults
+    private let logoFileURL: URL
 
-    /// `defaults` is injectable so tests can use an in-memory suite instead
-    /// of polluting `.standard` across the simulator.
-    init(defaults: UserDefaults = .standard) {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "swiftpdf",
+        category: "AppSettings"
+    )
+
+    /// Both `defaults` and `logoFileURL` are injectable so tests can swap in
+    /// throwaway suites + temp directories rather than polluting `.standard`
+    /// or the real Documents directory. Production callers leave both at
+    /// their defaults (`.standard` UserDefaults, `Documents/companyLogo.jpg`).
+    init(defaults: UserDefaults = .standard, logoFileURL: URL? = nil) {
         self.defaults = defaults
+        self.logoFileURL = logoFileURL ?? Self.defaultLogoFileURL()
         self.brandColorHex = defaults.string(forKey: Self.brandColorKey) ?? Self.defaultBrandColorHex
         self.companyName = defaults.string(forKey: Self.companyNameKey) ?? ""
         self.companyLocation = defaults.string(forKey: Self.companyLocationKey) ?? ""
         self.companyDepartment = defaults.string(forKey: Self.companyDepartmentKey) ?? ""
-        self.companyLogoData = defaults.data(forKey: Self.companyLogoKey)
+        // One-time migration for installs that already have a logo blob in
+        // UserDefaults from before this change. Idempotent — once the file
+        // exists, the legacy blob is ignored on subsequent inits.
+        Self.migrateLogoFromUserDefaultsIfNeeded(defaults: defaults, to: self.logoFileURL)
+        self.companyLogoData = Self.loadLogoData(from: self.logoFileURL)
+    }
+
+    /// Writes the in-memory logo bytes to disk and applies the backup
+    /// exclusion attribute. Clearing the logo deletes the file. Errors are
+    /// logged but don't propagate — a failed save is less bad than crashing
+    /// the manager's Settings edit mid-flow.
+    private func persistLogo(_ data: Data?) {
+        do {
+            if let data {
+                try data.write(to: logoFileURL, options: [.atomic])
+                try Self.applyBackupExclusion(to: logoFileURL)
+            } else if FileManager.default.fileExists(atPath: logoFileURL.path) {
+                try FileManager.default.removeItem(at: logoFileURL)
+            }
+        } catch {
+            Self.logger.error("companyLogo persist failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    private static func defaultLogoFileURL() -> URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appendingPathComponent("companyLogo.jpg")
+    }
+
+    private static func loadLogoData(from url: URL) -> Data? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    /// One-time migration: if the legacy UserDefaults blob exists and the
+    /// on-disk file does not, copy bytes over and remove the UserDefaults
+    /// entry. Subsequent inits no-op because the file exists. If the file
+    /// write fails, the legacy blob is left intact so a future launch can
+    /// retry (e.g. disk full at first launch).
+    private static func migrateLogoFromUserDefaultsIfNeeded(
+        defaults: UserDefaults,
+        to fileURL: URL
+    ) {
+        if FileManager.default.fileExists(atPath: fileURL.path) { return }
+        guard let legacy = defaults.data(forKey: legacyCompanyLogoKey) else { return }
+        do {
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try legacy.write(to: fileURL, options: [.atomic])
+            try applyBackupExclusion(to: fileURL)
+            defaults.removeObject(forKey: legacyCompanyLogoKey)
+            logger.info("companyLogo migrated from UserDefaults to file storage")
+        } catch {
+            logger.error("companyLogo migration failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    /// Marks the file so iOS does not include it in standard or iCloud
+    /// backups. Reapplied on every persist — atomic file replacement resets
+    /// the resource value, so re-applying after each write is necessary.
+    private static func applyBackupExclusion(to fileURL: URL) throws {
+        var url = fileURL
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
     }
 
     /// Decoded `UIImage` view of `companyLogoData`. Returns nil if no logo is
@@ -123,7 +199,10 @@ final class AppSettings {
     private static let companyNameKey = "companyName"
     private static let companyLocationKey = "companyLocation"
     private static let companyDepartmentKey = "companyDepartment"
-    private static let companyLogoKey = "companyLogoData"
+    /// Legacy UserDefaults key for the JPEG-encoded logo. Read once at
+    /// init time to drive a one-shot migration to on-disk file storage.
+    /// Not written to going forward.
+    private static let legacyCompanyLogoKey = "companyLogoData"
     /// Matches `UIColor.systemOrange` resolved against a light trait collection
     /// (the way it'll render in the PDF). SwiftUI's `Color.orange` resolves to
     /// the same RGB so the in-app surface matches the PDF output.
