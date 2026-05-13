@@ -6,7 +6,7 @@ Hand a customer the iPad, they sign with finger or Pencil, the app flattens to P
 
 ## Why this repository is public
 
-SwiftPDF Signer's [privacy policy](./Design/privacy-policy.md) makes specific claims — no data collection, no analytics, no developer access to anything you sign. Publishing the source is how those claims become verifiable. Anyone can:
+SwiftPDF Signer's [privacy policy](https://apps.bar-all.com/swiftpdf/privacy) makes specific claims — no data collection, no analytics, no developer access to anything you sign. Publishing the source is how those claims become verifiable. Anyone can:
 
 1. Read the code to confirm what the app actually does
 2. Clone, build, and run a version themselves
@@ -14,13 +14,13 @@ SwiftPDF Signer's [privacy policy](./Design/privacy-policy.md) makes specific cl
 
 To make verification concrete, each build embeds the commit SHA visible in **Settings → About**. Tap it to open this repository at the exact revision the installed binary was built from.
 
-## What this is, technically
+## What this is
 
 - Native SwiftUI; iOS 18.6 minimum; iPhone + iPad
 - [SwiftyDropbox](https://github.com/dropbox/SwiftyDropbox) for OAuth (PKCE) + file upload to a Dropbox app folder
 - PDF rendering via `UIGraphicsPDFRenderer` + `NSAttributedString` (no PDFKit dependency for the output path)
 - Signature capture via PencilKit
-- Manager-gated administrative actions via `LocalAuthentication` (Face ID / passcode)
+- Manager-gated administrative actions via `LocalAuthentication` (Face ID / TouchID / passcode)
 - No backend, no analytics SDKs, no advertising SDKs, no crash reporters
 
 ## Building from source
