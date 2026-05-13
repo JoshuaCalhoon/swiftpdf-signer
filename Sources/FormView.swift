@@ -278,8 +278,17 @@ struct FormView: View {
             // differs from what we asked for, mark the success so the manager
             // sees the warning. App-folder scope means `pathDisplay` looks
             // like "/Signed/{filename}".
+            //
+            // Both sides get NFC-normalized first. Dropbox stores paths in
+            // canonical NFC form, so a signer name containing combining
+            // characters (e.g., `José` as `Jose\u{0301}` decomposed) round-
+            // trips as NFC `Jos\u{00E9}`. Without normalization, the raw
+            // compare treats these as different paths and falsely flags
+            // every Unicode-named signer's upload as autorenamed.
             let requestedPath = "\(DropboxConfig.uploadFolder)/\(upload.filename)"
-            let autorenamedFrom = resolved.caseInsensitiveCompare(requestedPath) == .orderedSame
+            let resolvedKey = resolved.precomposedStringWithCanonicalMapping
+            let requestedKey = requestedPath.precomposedStringWithCanonicalMapping
+            let autorenamedFrom = resolvedKey.caseInsensitiveCompare(requestedKey) == .orderedSame
                 ? nil
                 : requestedPath
             status = .success(path: resolved, autorenamedFrom: autorenamedFrom)
