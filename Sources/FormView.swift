@@ -199,9 +199,18 @@ struct FormView: View {
     @ViewBuilder
     private var statusBanner: some View {
         if case .failure(let message) = status {
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.callout)
-                .foregroundStyle(Color(.systemRed))
+            VStack(alignment: .leading, spacing: 8) {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(Color(.systemRed))
+                // Surfaced whenever the upload has failed. Mandatory when
+                // `pendingUpload` is pinned (the cache survives canvas edits to
+                // prevent a stylus-tap race producing two near-duplicate
+                // signed PDFs), and harmless in the render-failure case too.
+                Button("Start Over", action: startOver)
+                    .font(.footnote)
+                    .buttonStyle(.bordered)
+            }
         }
         // .success is rendered by `successPanel` — the bottom panel swaps wholesale.
         // .idle renders nothing.
@@ -295,19 +304,30 @@ struct FormView: View {
         signature = PKDrawing()
     }
 
-    /// Drops the cached PDF and any non-idle status whenever inputs change,
-    /// so a fresh edit always re-renders from scratch. The success state is
-    /// dismissed via `signAnother()`, not by editing — by the time onChange
-    /// fires here, `status` is already `.idle`.
+    /// Failure-banner escape hatch. Customer hits this when they want to
+    /// re-sign from scratch instead of retrying the cached upload — clears
+    /// every field and drops the pinned cache so the next submit re-renders.
+    private func startOver() {
+        pendingUpload = nil
+        status = .idle
+        printName = ""
+        signature = PKDrawing()
+    }
+
+    /// Resets transient status when inputs change *before* a render has
+    /// happened. Once `pendingUpload` is set (i.e., we've already rendered
+    /// once), the cache is pinned — a stylus tap on the canvas or a keystroke
+    /// in the name field is a no-op here, so a Retry path re-uploads the
+    /// SAME bytes/filename rather than a freshly-rendered PDF with a drifted
+    /// `signedAt`. The customer clears the cache explicitly via the Start
+    /// Over button on the failure banner.
     ///
-    /// Skipped while `isUploading` so a stray stylus tap mid-upload (which
-    /// fires `onChange(of: signature)`) doesn't drop the cached `PendingUpload`
-    /// while the server is mid-write. Without this, a transient failure +
-    /// retry path could end up uploading a freshly-rendered PDF with a
-    /// different `signedAt` than the first attempt.
+    /// Skipped while `isUploading` for the same reason: a stray stylus tap
+    /// mid-upload (which fires `onChange(of: signature)`) must not perturb
+    /// the in-flight render.
     private func invalidateAfterEdit() {
         guard !isUploading else { return }
-        pendingUpload = nil
+        guard pendingUpload == nil else { return }
         if status != .idle {
             status = .idle
         }
