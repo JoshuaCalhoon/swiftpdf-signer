@@ -200,18 +200,17 @@
       <ul>
         <li>The Dropbox SDK opens a Dropbox-hosted OAuth screen in an in-app browser. You sign in directly with Dropbox; we never see your Dropbox username or password.</li>
         <li>On success, Dropbox returns an OAuth refresh token that is stored on your device in the iOS Keychain.</li>
-        <li>The app reads your Dropbox account email address (so the Settings screen can show which account you're connected to) and reads/writes files within a single dedicated folder: <code>/Apps/SwiftPDF Signer/</code>. The app cannot access any other folder in your Dropbox.</li>
+        <li>The app reads and writes files within a single dedicated folder in your Dropbox: <code>/Apps/SwiftPDF Signer/</code>. The app cannot access any other folder.</li>
         <li>Signed PDFs are uploaded directly from your device to your Dropbox account. They do not pass through any server we operate.</li>
       </ul>
 
       <h2>What the Dropbox SDK processes</h2>
-      <p>The Dropbox SDK declares to Apple, via its privacy manifest, that it may process the following data types in connection with delivering uploads to your Dropbox account. We surface all of them here for transparency:</p>
+      <p>The following data types are transmitted to Dropbox in connection with delivering uploads to your account. The Dropbox SDK declares all but <strong>Name</strong> in its Apple privacy manifest; we surface them all here for transparency:</p>
       <ul>
-        <li><strong>Email address</strong> — from your Dropbox account, displayed in the app's Settings screen</li>
-        <li><strong>User ID</strong> — your Dropbox account ID, used for authentication</li>
+        <li><strong>Name</strong> — the signer's name appears in the body of the PDF you sign and in the upload filename (<code>{Form} - {Signer} [{Date}].pdf</code>), both of which are delivered to your Dropbox account</li>
         <li><strong>Other user content</strong> — the PDF files you sign and upload</li>
         <li><strong>Photos or videos</strong> — the Dropbox API category that covers uploaded files; the app itself uploads only PDFs and <code>.json</code> template files.</li>
-        <li><strong>Audio data, search history</strong> — supported by the broader Dropbox API but never exercised by this app</li>
+        <li><strong>Email address, User ID, audio data, search history</strong> — supported by the broader Dropbox API but never fetched or exercised by this app</li>
         <li><strong>Product interaction, other diagnostic data</strong> — operational metadata the Dropbox SDK may send to Dropbox to deliver the upload service</li>
       </ul>
       <p>None of these are used for cross-app or cross-site tracking. All are linked to your Dropbox account because that is where your data is delivered. All are processed solely to enable the app's functionality.</p>
@@ -221,13 +220,13 @@
       <p>We do not integrate any other third-party services, SDKs, or analytics providers.</p>
 
       <h2>Data retention</h2>
-      <p>Because we don't store your data on any infrastructure we operate, there is nothing for us to retain. Files you upload remain in your Dropbox account until you delete them. The OAuth refresh token remains in your device's Keychain until you tap "Disconnect Dropbox" in Settings, at which point it is removed.</p>
+      <p>Because we don't store your data on any infrastructure we operate, there is nothing for us to retain. Files you upload remain in your Dropbox account until you delete them. The OAuth refresh token remains in your device's Keychain until you tap "Disconnect Dropbox" from the template library's "…" menu, at which point it is removed.</p>
 
       <h2>Your rights</h2>
       <p>Because your data is held in your own Dropbox account or on your own device, you have direct control over it at all times. You can:</p>
       <ul>
         <li>View, edit, or delete any signed PDF directly through Dropbox.</li>
-        <li>Revoke the app's access to Dropbox at any time, either from within SwiftPDF Signer (Settings → Disconnect Dropbox) or from your Dropbox account's connected-apps page at <a href="https://www.dropbox.com/account/connected_apps">https://www.dropbox.com/account/connected_apps</a>.</li>
+        <li>Revoke the app's access to Dropbox at any time, either from within SwiftPDF Signer (template library → "…" menu → Disconnect Dropbox) or from your Dropbox account's connected-apps page at <a href="https://www.dropbox.com/account/connected_apps">https://www.dropbox.com/account/connected_apps</a>.</li>
         <li>Delete the app from your device to remove all locally stored settings and the OAuth refresh token.</li>
         <li>For data Dropbox handles on your behalf, exercise your rights under their privacy policy — including any GDPR, CCPA, or other applicable rights — directly with Dropbox.</li>
       </ul>

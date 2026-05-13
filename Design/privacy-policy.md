@@ -4,7 +4,7 @@
 
 ## Summary
 
-SwiftPDF Signer is an iOS app that lets you fill in and sign PDF forms on your iPad and upload the signed copies to your own Dropbox account. We don't collect any personal data, we don't track you, we run no servers, and we don't have access to the forms you sign. Your data stays between your device and your own Dropbox account.
+SwiftPDF Signer is an iOS app that lets you fill in and sign PDF forms on your iPad and upload the signed copies to your own Dropbox account. We don't collect any personal data, we don't track you, we run no servers, and we don't have access to the forms you sign. Your data stays between your device and your own Dropbox account. The public source the app is built from is available here: https://github.com/JoshuaCalhoon/swiftpdf-signer. It’s also available as the SourceRepository string in the App Bundle. 
 
 ## What data the app collects
 
@@ -24,18 +24,17 @@ To upload signed PDFs to your Dropbox, the app integrates the official Dropbox S
 
 - The Dropbox SDK opens a Dropbox-hosted OAuth screen in an in-app browser. You sign in directly with Dropbox; we never see your Dropbox username or password.
 - On success, Dropbox returns an OAuth refresh token that is stored on your device in the iOS Keychain.
-- The app reads your Dropbox account email address (so the Settings screen can show which account you're connected to) and reads/writes files within a single dedicated folder: `/Apps/SwiftPDF Signer/`. The app cannot access any other folder in your Dropbox.
+- The app reads and writes files within a single dedicated folder in your Dropbox: `/Apps/SwiftPDF Signer/`. The app cannot access any other folder.
 - Signed PDFs are uploaded directly from your device to your Dropbox account. They do not pass through any server we operate.
 
 ## What the Dropbox SDK processes
 
-The Dropbox SDK declares to Apple, via its privacy manifest, that it may process the following data types in connection with delivering uploads to your Dropbox account. We surface all of them here for transparency:
+The following data types are transmitted to Dropbox in connection with delivering uploads to your account. The Dropbox SDK declares all but **Name** in its Apple privacy manifest; we surface them all here for transparency:
 
-- **Email address** — from your Dropbox account, displayed in the app's Settings screen
-- **User ID** — your Dropbox account ID, used for authentication
+- **Name** — the signer's name appears in the body of the PDF you sign and in the upload filename (`{Form} - {Signer} [{Date}].pdf`), both of which are delivered to your Dropbox account
 - **Other user content** — the PDF files you sign and upload
-- **Photos or videos** — the Dropbox API category that covers uploaded files; the app itself uploads only PDFs
-- **Audio data, search history** — supported by the broader Dropbox API but never exercised by this app
+- **Photos or videos** — the Dropbox API category that covers uploaded files; the app itself uploads only PDFs and .json template files.
+- **Email address, User ID, audio data, search history** — supported by the broader Dropbox API but never fetched or exercised by this app
 - **Product interaction, other diagnostic data** — operational metadata the Dropbox SDK may send to Dropbox to deliver the upload service
 
 None of these are used for cross-app or cross-site tracking. All are linked to your Dropbox account because that is where your data is delivered. All are processed solely to enable the app's functionality.
@@ -48,14 +47,14 @@ We do not integrate any other third-party services, SDKs, or analytics providers
 
 ## Data retention
 
-Because we don't store your data on any infrastructure we operate, there is nothing for us to retain. Files you upload remain in your Dropbox account until you delete them. The OAuth refresh token remains in your device's Keychain until you tap "Disconnect Dropbox" in Settings, at which point it is removed.
+Because we don't store your data on any infrastructure we operate, there is nothing for us to retain. Files you upload remain in your Dropbox account until you delete them. The OAuth refresh token remains in your device's Keychain until you tap "Disconnect Dropbox" from the template library's "…" menu, at which point it is removed.
 
 ## Your rights
 
 Because your data is held in your own Dropbox account or on your own device, you have direct control over it at all times. You can:
 
 - View, edit, or delete any signed PDF directly through Dropbox.
-- Revoke the app's access to Dropbox at any time, either from within SwiftPDF Signer (Settings → Disconnect Dropbox) or from your Dropbox account's connected-apps page at <https://www.dropbox.com/account/connected_apps>.
+- Revoke the app's access to Dropbox at any time, either from within SwiftPDF Signer (template library → "…" menu → Disconnect Dropbox) or from your Dropbox account's connected-apps page at <https://www.dropbox.com/account/connected_apps>.
 - Delete the app from your device to remove all locally stored settings and the OAuth refresh token.
 - For data Dropbox handles on your behalf, exercise your rights under their privacy policy — including any GDPR, CCPA, or other applicable rights — directly with Dropbox.
 
@@ -71,8 +70,8 @@ If we change this policy, the new effective date will appear at the top of this 
 
 Questions about this privacy policy:
 
-**privacy@bar-all.com**
+**josh@bar-all.com**
 
 ---
 
-*SwiftPDF Signer is published by Bar-All IT. Source available on the Bar-All IT internal Gitea.*
+*SwiftPDF Signer is published by Bar-All IT. Source available on GitHub at: https://github.com/JoshuaCalhoon/swiftpdf-signer*
