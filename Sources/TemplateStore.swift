@@ -94,11 +94,16 @@ final class TemplateStore {
                 }
             }
 
-            // First-run seed. If the user has no templates and we haven't
-            // seeded yet on this iPad, upload the sample. A seed failure is
-            // logged but doesn't fail the whole refresh — the user can still
-            // create templates manually.
-            if loaded.isEmpty && !defaults.bool(forKey: Self.hasSeededSampleKey) {
+            // First-run seed. If the user's Dropbox templates folder is
+            // genuinely empty (zero entries) and we haven't seeded yet on
+            // this iPad, upload the sample. Keyed on `refs.isEmpty` rather
+            // than `loaded.isEmpty` so an account whose existing templates
+            // all fail to decode (corrupt JSON, partial sync) doesn't get
+            // a "Warehouse Waiver" appearing next to their failing files
+            // — they see the skip-count warning in the library footer
+            // instead. A seed failure is logged but doesn't fail the whole
+            // refresh — the user can still create templates manually.
+            if refs.isEmpty && !defaults.bool(forKey: Self.hasSeededSampleKey) {
                 let sample = FormTemplate.makeFreshSample()
                 do {
                     let data = try Self.makeEncoder().encode(sample)
