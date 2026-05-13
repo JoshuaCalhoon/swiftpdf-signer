@@ -35,11 +35,9 @@ Configuration/Local.xcconfig
 .vscode/
 .idea/
 
-# Code/security review artifacts — generated locally, kept out of git
-CLAUDE-REVIEW.md
-REVIEW.md
-SECURITY-REVIEW.md
-REMEDIATION-PLAN.md
+# Code/security review artifacts — generated locally, kept out of git.
+# Consolidated under reviews/ so dated backups and cross-reference docs stay together.
+reviews/
 .gstack/
 
 # Project-memory workflow files — local context for AI coding sessions, not for publication.
