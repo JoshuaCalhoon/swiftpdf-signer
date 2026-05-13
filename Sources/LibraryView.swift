@@ -68,11 +68,12 @@ struct LibraryView: View {
                             onDelete: { deleting = template }
                         )
                     } else {
+                        // Customer-facing row: tap to sign, no shortcut to
+                        // Edit / Delete. Manager mutation lives behind the
+                        // Manage-mode gate so a curious customer can't swipe
+                        // to expose template-modification options.
                         NavigationLink(value: template) {
                             TemplateRow(template: template)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            rowSwipeActions(for: template)
                         }
                     }
                 }
@@ -87,7 +88,13 @@ struct LibraryView: View {
                     Spacer()
                     if !store.templates.isEmpty {
                         Button(isManaging ? "Done" : "Manage") {
-                            isManaging.toggle()
+                            if isManaging {
+                                // Exit is free — leaving Manage mode doesn't
+                                // require auth, matches the 30s-grace pattern.
+                                isManaging = false
+                            } else {
+                                Task { await tryEnterManage() }
+                            }
                         }
                         .textCase(nil)
                         .fontWeight(isManaging ? .semibold : .regular)
@@ -99,7 +106,7 @@ struct LibraryView: View {
 
             Section {
                 Button {
-                    showNewTemplate = true
+                    Task { await tryNewTemplate() }
                 } label: {
                     Label("New Template", systemImage: "plus.circle.fill")
                         .foregroundStyle(settings.brandColor)
@@ -168,29 +175,35 @@ struct LibraryView: View {
         }
     }
 
-    @ViewBuilder
-    private func rowSwipeActions(for template: FormTemplate) -> some View {
-        if template.editable {
-            Button(role: .destructive) {
-                deleting = template
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            // Disable the swipe action for a row whose delete is mid-flight so
-            // a second tap can't fire a duplicate `deleteV2` call (harmless but
-            // produces a misleading "couldn't delete" alert for a delete that
-            // already succeeded).
-            .disabled(inFlightActions.contains(template.id))
-            // Edit available for all editable templates — the editor flattens
-            // structured content (today only the bundled sample) to freeform
-            // on prefill, so a manager opening a structured template gets an
-            // editable text block instead of an empty editor.
-            Button {
-                editing = template
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            .tint(settings.brandColor)
+    /// Manager-only entry to Manage mode. Once in, Edit / Duplicate / Delete
+    /// fire without further prompts (30s-grace pattern). Exit Manage mode is
+    /// free — leaving doesn't mutate anything.
+    private func tryEnterManage() async {
+        switch await ManagerGate.require(reason: "Manage templates") {
+        case .authenticated:
+            isManaging = true
+        case .userCancelled:
+            break
+        case .notConfigured:
+            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+        case .failed(let message):
+            gateError = message
+        }
+    }
+
+    /// New Template lives outside Manage mode (it's its own primary button on
+    /// the library list), so it gets its own gate. Once authenticated, the
+    /// editor sheet opens for the new-template flow.
+    private func tryNewTemplate() async {
+        switch await ManagerGate.require(reason: "Create a new template") {
+        case .authenticated:
+            showNewTemplate = true
+        case .userCancelled:
+            break
+        case .notConfigured:
+            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+        case .failed(let message):
+            gateError = message
         }
     }
 
