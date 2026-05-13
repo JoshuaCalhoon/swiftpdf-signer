@@ -91,7 +91,7 @@ targets:
         # preBuildScript. Replace before the first push to GitHub to match the
         # actual public repo URL.
         SourceRepository: https://github.com/JoshuaCalhoon/swiftpdf-signer
-        NSFaceIDUsageDescription: Confirms a manager is present before returning to the template library or disconnecting Dropbox. The customer signing on this iPad should never be able to trigger these actions.
+        NSFaceIDUsageDescription: Confirms a manager is present before any administrative action — returning to the template library, opening Settings, managing or creating templates, or connecting/disconnecting Dropbox. The customer signing on this iPad should never be able to trigger these actions.
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLName: com.bar-all.swiftpdf.dropbox
