@@ -51,8 +51,37 @@ struct ConnectDropboxView: View {
     }
 
     private func startAuth() {
-        guard let controller = topViewController() else { return }
-        dropbox.authorize(from: controller)
+        // First install with no passcode set must reach the authorized state
+        // at least once — the gate has no meaningful answer when the device
+        // hasn't been through IT setup. Subsequent Connect taps (post a
+        // previous authorize or unauthorize) require manager identity, since
+        // by then a customer could be holding the iPad and a fresh Connect
+        // would redirect uploads to their Dropbox.
+        if !ManagerGate.hasCompletedFirstSetup {
+            guard let controller = topViewController() else { return }
+            dropbox.authorize(from: controller)
+            return
+        }
+
+        Task {
+            switch await ManagerGate.require(reason: "Connect Dropbox account") {
+            case .authenticated:
+                guard let controller = topViewController() else { return }
+                dropbox.authorize(from: controller)
+            case .userCancelled:
+                // Manager backed out of the biometric prompt. Stay where we
+                // are; the Connect button is still visible.
+                break
+            case .notConfigured:
+                // Setup has happened before but the iPad's passcode is now
+                // missing. Refuse rather than bypassing — if a customer
+                // briefly held the iPad while IT removed the passcode,
+                // bypassing here would defeat the gate.
+                dropbox.surfaceAuthError("This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before reconnecting.")
+            case .failed(let message):
+                dropbox.surfaceAuthError(message)
+            }
+        }
     }
 
     private func topViewController() -> UIViewController? {

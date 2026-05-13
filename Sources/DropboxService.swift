@@ -18,6 +18,11 @@ final class DropboxService {
         DropboxClientsManager.setupWithAppKey(DropboxConfig.appKey)
         if DropboxClientsManager.authorizedClient != nil {
             authState = .authorized
+            // Covers app-relaunch with persisted credentials and
+            // upgrade-from-prior-version: if we already have a client, we
+            // are by definition past first setup, even if this is the first
+            // launch under the gated-Connect-button code path.
+            ManagerGate.markFirstSetupComplete()
         }
     }
 
@@ -40,6 +45,9 @@ final class DropboxService {
                 switch result {
                 case .success:
                     self.authState = .authorized
+                    // First successful authorize on this install. From here
+                    // on, Connect Dropbox taps require ManagerGate.
+                    ManagerGate.markFirstSetupComplete()
                 case .cancel:
                     // User backed out of the OAuth screen. Reset to the
                     // connect-prompt state.
@@ -87,6 +95,16 @@ final class DropboxService {
     func unauthorize() {
         DropboxClientsManager.unlinkClients()
         authState = .notAuthorized
+        // We were authorized to be able to unauthorize — guarantee the
+        // first-setup flag is set so the next Connect tap hits the gate.
+        ManagerGate.markFirstSetupComplete()
+    }
+
+    /// Routes a ManagerGate failure into the same `authFailed` UI as Dropbox
+    /// SDK errors. Used by `ConnectDropboxView` when the gate rejects a
+    /// Connect attempt (cancelled biometric prompt, missing passcode).
+    func surfaceAuthError(_ message: String) {
+        authState = .authFailed(message: message)
     }
 
     /// Uploads the signed PDF; returns the canonical Dropbox path.

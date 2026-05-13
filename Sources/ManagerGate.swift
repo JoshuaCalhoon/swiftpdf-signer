@@ -74,4 +74,30 @@ enum ManagerGate {
     static func invalidate() {
         lastAuthenticatedAt = nil
     }
+
+    // MARK: - First-setup bookkeeping
+
+    /// UserDefaults key for the persistent "this iPad has been configured"
+    /// flag. Lives in standard defaults so iOS-managed app data backup
+    /// captures it — the flag survives the app being killed but not a
+    /// reinstall, which matches the "starting fresh" intent.
+    private static let firstSetupKey = "managerGate.firstSetupCompleted"
+
+    /// True once the device has completed initial Dropbox setup at least
+    /// once in the current install. Read by `ConnectDropboxView` to decide
+    /// whether the Connect button needs gating: a fresh install with no
+    /// iOS passcode set must be able to authorize once (otherwise the app
+    /// is unusable on a device that hasn't been through IT setup yet).
+    /// Once true, never returns to false in the same install.
+    static var hasCompletedFirstSetup: Bool {
+        UserDefaults.standard.bool(forKey: firstSetupKey)
+    }
+
+    /// Idempotent flag-flip. Called from `DropboxService` on the first
+    /// successful authorize, on each unauthorize, and on init when an
+    /// existing client is found in the SDK store (covers app-relaunch and
+    /// upgrade-from-prior-version paths).
+    static func markFirstSetupComplete() {
+        UserDefaults.standard.set(true, forKey: firstSetupKey)
+    }
 }
