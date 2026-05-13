@@ -125,7 +125,7 @@ final class DropboxService {
                 unauthorize()
                 throw ServiceError.notAuthorized
             }
-            throw error
+            throw Self.translatingNetworkErrors(error)
         }
     }
 
@@ -155,7 +155,7 @@ final class DropboxService {
                 unauthorize()
                 throw ServiceError.notAuthorized
             }
-            throw error
+            throw Self.translatingNetworkErrors(error)
         }
     }
 
@@ -174,7 +174,7 @@ final class DropboxService {
                 unauthorize()
                 throw ServiceError.notAuthorized
             }
-            throw error
+            throw Self.translatingNetworkErrors(error)
         }
     }
 
@@ -197,7 +197,7 @@ final class DropboxService {
                 unauthorize()
                 throw ServiceError.notAuthorized
             }
-            throw error
+            throw Self.translatingNetworkErrors(error)
         }
     }
 
@@ -215,7 +215,7 @@ final class DropboxService {
                 unauthorize()
                 throw ServiceError.notAuthorized
             }
-            throw error
+            throw Self.translatingNetworkErrors(error)
         }
     }
 
@@ -237,12 +237,64 @@ final class DropboxService {
         return nil
     }
 
+    /// SwiftyDropbox wraps URLSession failures (offline, timeout, DNS, etc.)
+    /// as `CallError.clientError(.urlSessionError(URLError))`. Unwrap that
+    /// shape so each call site can translate to a user-facing
+    /// `ServiceError.networkUnreachable` instead of throwing a CallError
+    /// whose `localizedDescription` is the SDK's debug format.
+    ///
+    /// The inner error may be a Swift `URLError` directly or an NSError
+    /// bridged from one (URLError bridges to `NSURLErrorDomain`). Both
+    /// shapes occur in practice depending on which underlying API path
+    /// produced the failure.
+    private static func unwrappedURLError<E>(from error: CallError<E>) -> URLError? {
+        guard case .clientError(let clientError) = error,
+              case .urlSessionError(let inner) = clientError else { return nil }
+        if let urlError = inner as? URLError { return urlError }
+        let ns = inner as NSError
+        if ns.domain == NSURLErrorDomain {
+            return URLError(URLError.Code(rawValue: ns.code))
+        }
+        return nil
+    }
+
+    /// Replaces a CallError carrying a URLSession failure with a
+    /// `ServiceError.networkUnreachable` so the resulting
+    /// `localizedDescription` is the action-oriented copy from
+    /// `ServiceError.errorDescription`. Non-network CallErrors pass through
+    /// unchanged.
+    private static func translatingNetworkErrors<E>(_ error: CallError<E>) -> Error {
+        if let urlError = unwrappedURLError(from: error) {
+            return ServiceError.networkUnreachable(urlError.code)
+        }
+        return error
+    }
+
     enum ServiceError: LocalizedError {
         case notAuthorized
+        /// A URLSession failure surfaced through `DropboxService` — usually
+        /// offline, network lost, DNS unreachable, or timed-out. The wrapped
+        /// `URLError.Code` lets the caller distinguish if needed, but the
+        /// default `errorDescription` is sufficient for failure banners.
+        case networkUnreachable(URLError.Code)
 
         var errorDescription: String? {
             switch self {
-            case .notAuthorized: return "Dropbox is not connected"
+            case .notAuthorized:
+                return "Dropbox is not connected"
+            case .networkUnreachable(let code):
+                switch code {
+                case .notConnectedToInternet:
+                    return "No internet connection. Connect to a network and try again."
+                case .networkConnectionLost:
+                    return "The network connection was lost. Reconnect and try again."
+                case .timedOut:
+                    return "The connection timed out. Try again once you have a stable network."
+                case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+                    return "Couldn't reach Dropbox. Check your network and try again."
+                default:
+                    return "Network error. Check your connection and try again."
+                }
             }
         }
     }
