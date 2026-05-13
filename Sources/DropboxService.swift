@@ -1,6 +1,6 @@
 import Foundation
 import UIKit
-import SwiftyDropbox
+@preconcurrency import SwiftyDropbox
 
 @MainActor
 @Observable
