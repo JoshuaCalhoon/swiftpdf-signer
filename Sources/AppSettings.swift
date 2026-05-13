@@ -128,8 +128,8 @@ final class AppSettings {
     /// (the way it'll render in the PDF). SwiftUI's `Color.orange` resolves to
     /// the same RGB so the in-app surface matches the PDF output.
     private static let defaultBrandColorHex = "#FF9500"
-    static let defaultBrandColor: Color = .orange
-    static let defaultBrandUIColor: UIColor = .systemOrange
+    nonisolated static let defaultBrandColor: Color = .orange
+    nonisolated static let defaultBrandUIColor: UIColor = .systemOrange
 }
 
 // MARK: - Hex helpers
