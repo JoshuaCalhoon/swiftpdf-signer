@@ -65,6 +65,8 @@ struct SettingsView: View {
                         workingColor = settings.brandColor
                     }
                 }
+
+                aboutSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -148,6 +150,56 @@ struct SettingsView: View {
             Text("Company Logo")
         } footer: {
             Text("Optional. Renders at the left of the header on signed PDFs and in the in-app preview. Square images look best — non-square images are letterboxed inside a square slot.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Source-provenance row. `SourceRepository` and `SourceCommit` are wired
+    /// in via `project.yml` and a preBuildScript that captures `git rev-parse
+    /// HEAD` per build. Production builds should be made from a fresh clone of
+    /// the public repo so the displayed commit corresponds to a real,
+    /// reviewable revision.
+    @ViewBuilder
+    private var aboutSection: some View {
+        Section {
+            HStack {
+                Text("Version")
+                Spacer()
+                Text("\(BuildInfo.version) (\(BuildInfo.build))")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            if let url = BuildInfo.sourceCommitURL {
+                Link(destination: url) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Source code")
+                                .foregroundStyle(.primary)
+                            Text("\(BuildInfo.sourceRepository) @ \(BuildInfo.sourceCommitShort)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.up.right.square")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Source code")
+                    Text("\(BuildInfo.sourceRepository) @ \(BuildInfo.sourceCommitShort)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("About")
+        } footer: {
+            Text("This app's source is published at the repository above. The commit hash identifies the exact source state this build was produced from — anyone can clone, build, and verify the app's behavior. A `-dirty` suffix means the build was made from a working tree with uncommitted changes.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
