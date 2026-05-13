@@ -62,7 +62,7 @@ This repository is a public snapshot of an internal Gitea repository where devel
 
 ## Author
 
-Directed by [Joshua Calhoon](https://github.com/JoshuaCalhoon), IT Administrator at [Bar-All IT](https://bar-all.com). Code written by Claude Code and/or local LLM models.
+Directed by [Joshua Calhoon](https://github.com/JoshuaCalhoon), IT Administrator at [Bar-All](https://barallinc.com). Code written by Claude Code and/or local LLM models.
 
 ## Security
 
