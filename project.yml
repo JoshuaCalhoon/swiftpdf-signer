@@ -77,6 +77,15 @@ targets:
         CFBundleDisplayName: SwiftPDF Signer
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "2"
+        # Export compliance: the app uses only Apple-provided standard
+        # cryptography (URLSession HTTPS/TLS via SwiftyDropbox, Keychain
+        # for the Dropbox refresh token, ASWebAuthenticationSession for
+        # OAuth PKCE). No third-party crypto libraries, no proprietary
+        # algorithms, no encrypted file formats. Declaring `false` here
+        # makes App Store Connect skip the per-upload encryption
+        # questionnaire — qualifies under the standard-cryptography
+        # exemption.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: ""
         UIRequiresFullScreen: false
