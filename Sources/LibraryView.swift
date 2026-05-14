@@ -153,7 +153,7 @@ struct LibraryView: View {
         case .userCancelled:
             break
         case .notConfigured:
-            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+            gateError = ManagerGate.noPasscodeMessage
         case .failed(let message):
             gateError = message
         }
@@ -169,7 +169,7 @@ struct LibraryView: View {
         case .userCancelled:
             break
         case .notConfigured:
-            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+            gateError = ManagerGate.noPasscodeMessage
         case .failed(let message):
             gateError = message
         }
@@ -185,7 +185,7 @@ struct LibraryView: View {
         case .userCancelled:
             break
         case .notConfigured:
-            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+            gateError = ManagerGate.noPasscodeMessage
         case .failed(let message):
             gateError = message
         }
@@ -201,7 +201,7 @@ struct LibraryView: View {
         case .userCancelled:
             break
         case .notConfigured:
-            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+            gateError = ManagerGate.noPasscodeMessage
         case .failed(let message):
             gateError = message
         }
@@ -290,7 +290,7 @@ private struct LibraryDialogs: ViewModifier {
                 Button("Disconnect", role: .destructive, action: onDisconnect)
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("You'll need to reconnect on this iPad before you can upload signed forms again.")
+                Text("You'll need to reconnect on this device before you can upload signed forms again.")
             }
             .confirmationDialog(
                 deleting.map { "Delete \"\($0.name)\"?" } ?? "Delete template?",
@@ -304,7 +304,7 @@ private struct LibraryDialogs: ViewModifier {
                 Button("Delete", role: .destructive) { onConfirmDelete(template) }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
-                Text("This removes the template from Dropbox on every iPad signed in to this account. Forms already signed and uploaded aren't affected.")
+                Text("This removes the template from Dropbox on every device signed in to this account. Forms already signed and uploaded aren't affected.")
             }
             .alert(
                 "Action failed",

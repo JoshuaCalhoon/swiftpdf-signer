@@ -16,7 +16,7 @@ struct ConnectDropboxView: View {
             VStack(spacing: 8) {
                 Text("Connect Dropbox")
                     .font(.largeTitle.bold())
-                Text("One-time setup per iPad. Signed forms upload to your Dropbox app folder under /Apps.")
+                Text("One-time setup per device. Signed forms upload to your Dropbox app folder under /Apps.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 40)
@@ -73,11 +73,11 @@ struct ConnectDropboxView: View {
                 // are; the Connect button is still visible.
                 break
             case .notConfigured:
-                // Setup has happened before but the iPad's passcode is now
+                // Setup has happened before but the device's passcode is now
                 // missing. Refuse rather than bypassing — if a customer
-                // briefly held the iPad while IT removed the passcode,
+                // briefly held the device while IT removed the passcode,
                 // bypassing here would defeat the gate.
-                dropbox.surfaceAuthError("This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before reconnecting.")
+                dropbox.surfaceAuthError(ManagerGate.noPasscodeMessage)
             case .failed(let message):
                 dropbox.surfaceAuthError(message)
             }

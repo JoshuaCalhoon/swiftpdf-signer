@@ -75,6 +75,14 @@ enum ManagerGate {
         lastAuthenticatedAt = nil
     }
 
+    /// Standard surfaced-error copy when `require(...)` returns
+    /// `.notConfigured` — no passcode or biometric is configured on the
+    /// device. Single-sourced here because every gated surface (FormView,
+    /// LibraryView, ConnectDropboxView) renders the same message and the
+    /// app now runs on both iPhone and iPad, so the wording must be
+    /// device-agnostic.
+    static let noPasscodeMessage = "This device has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode."
+
     // MARK: - First-setup bookkeeping
 
     /// UserDefaults key for the persistent "this iPad has been configured"

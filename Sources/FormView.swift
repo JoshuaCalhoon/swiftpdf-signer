@@ -76,7 +76,7 @@ struct FormView: View {
         case .userCancelled:
             break
         case .notConfigured:
-            gateError = "This iPad has no passcode or biometric configured. Ask IT to set one in iOS Settings → Face ID & Passcode before continuing."
+            gateError = ManagerGate.noPasscodeMessage
         case .failed(let message):
             gateError = message
         }
