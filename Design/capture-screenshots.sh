@@ -25,13 +25,13 @@
 #   6. done → status bar overrides cleared on every booted sim
 #
 # Required device sizes (Apple App Store Connect, as of 2026-05):
-#   iphone-6.5 (iPhone 11 Pro Max,  1242×2688)  — REQUIRED for iPhone listings
-#   ipad-13    (iPad Pro 13" M4,    2064×2752)  — REQUIRED for iPad listings
+#   iphone-6.5 (iPhone Air,         6.5" display)  — REQUIRED for iPhone listings
+#   ipad-13    (iPad Pro 13" M4,    2064×2752)     — REQUIRED for iPad listings
 #
-# Per-device runtime: the iPhone uses the latest iOS runtime installed
-# (currently iOS 26.4 — better simulator perf, newer render parity); the
-# iPad is pinned to iOS 18.6 to match the physical iPad's OS version, so
-# the listing screenshots match what real users see.
+# Per-device runtime: the iPhone Air runs on iOS 26.5 (the device class
+# was introduced in that release); the iPad is pinned to iOS 18.6 to match
+# the physical iPad's OS version, so the listing screenshots match what
+# real iPad users see.
 #
 # Output filenames:
 #   01-library.png      02-form.png     03-signature.png ...
@@ -51,7 +51,7 @@ STATE_FILE="${TMPDIR:-/tmp}/swiftpdf-screenshot-session"
 # ships bash 3.2 — no `declare -A`.)
 device_name_for() {
     case "$1" in
-        iphone-6.5) printf 'iPhone 11 Pro Max' ;;
+        iphone-6.5) printf 'iPhone Air' ;;
         ipad-13)    printf 'iPad Pro 13-inch (M4)' ;;
         *)          return 1 ;;
     esac
@@ -59,7 +59,7 @@ device_name_for() {
 
 device_runtime_for() {
     case "$1" in
-        iphone-6.5) printf 'iOS 26.4' ;;
+        iphone-6.5) printf 'iOS 26.5' ;;
         ipad-13)    printf 'iOS 18.6' ;;
         *)          return 1 ;;
     esac
@@ -67,7 +67,7 @@ device_runtime_for() {
 
 device_type_id_for() {
     case "$1" in
-        iphone-6.5) printf 'com.apple.CoreSimulator.SimDeviceType.iPhone-11-Pro-Max' ;;
+        iphone-6.5) printf 'com.apple.CoreSimulator.SimDeviceType.iPhone-Air' ;;
         ipad-13)    printf 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M4-8GB' ;;
         *)          return 1 ;;
     esac
