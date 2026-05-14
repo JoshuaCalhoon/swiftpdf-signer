@@ -77,29 +77,44 @@ struct FormRenderer {
         var overflowed = false
         let signatureCeiling = Self.pageSize.height - Self.margin - Self.signatureBlockHeight
 
-        let data = renderer.pdfData { context in
-            context.beginPage()
-            var y = Self.margin
-            y = drawTitle(template.name, at: y)
-            y = drawHeader(template.header, at: y)
-            switch template.content {
-            case .structured(let intro, let rules, let acknowledgment):
-                y = drawIntro(intro, at: y)
-                y = drawRules(rules, at: y)
-                y = drawAcknowledgment(acknowledgment, at: y)
-            case .freeform(let body):
-                y = drawFreeformBody(body, at: y)
+        // Pin a light trait collection for the entire PDF render. The page
+        // background is always white, so a dynamic `UIColor` like
+        // `AppSettings.defaultBrandUIColor` (which adapts to dark mode) must
+        // resolve to its light-mode variant here regardless of the app's
+        // current appearance — otherwise a manager signing on a dark-mode
+        // iPad would bake bright-orange-on-white into the PDF and reproduce
+        // the same low-contrast bug that's fixed in-app. Same precedent as
+        // the inner wrap in `drawSignature` (kept for explicitness even
+        // though this outer wrap supersedes it).
+        //
+        // `performAsCurrent` returns Void, so we capture the rendered bytes
+        // into a local var rather than returning through the closure.
+        var data = Data()
+        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+            data = renderer.pdfData { context in
+                context.beginPage()
+                var y = Self.margin
+                y = drawTitle(template.name, at: y)
+                y = drawHeader(template.header, at: y)
+                switch template.content {
+                case .structured(let intro, let rules, let acknowledgment):
+                    y = drawIntro(intro, at: y)
+                    y = drawRules(rules, at: y)
+                    y = drawAcknowledgment(acknowledgment, at: y)
+                case .freeform(let body):
+                    y = drawFreeformBody(body, at: y)
+                }
+                if y > signatureCeiling {
+                    overflowed = true
+                    return  // signature block intentionally not drawn — we'll throw
+                }
+                drawSignatureBlock(
+                    printName: printName,
+                    signature: signature,
+                    signedAt: signedAt,
+                    at: y
+                )
             }
-            if y > signatureCeiling {
-                overflowed = true
-                return  // signature block intentionally not drawn — we'll throw
-            }
-            drawSignatureBlock(
-                printName: printName,
-                signature: signature,
-                signedAt: signedAt,
-                at: y
-            )
         }
         if overflowed {
             throw RenderError.contentTooLong

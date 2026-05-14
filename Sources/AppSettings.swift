@@ -177,17 +177,31 @@ final class AppSettings {
         return resized.jpegData(compressionQuality: quality)
     }
 
-    /// SwiftUI consumers. Falls back to `defaultBrandColor` if the stored hex
-    /// is somehow malformed — shouldn't happen on a normal save path, but a
-    /// human-edited `plist` could land here.
+    /// SwiftUI consumers. When the stored hex equals the default sentinel,
+    /// returns the adaptive `defaultBrandColor` (different shades in light vs
+    /// dark mode) instead of decoding the sentinel as a static color — the
+    /// bright `#FF9500` orange that looks excellent on dark backgrounds fails
+    /// WCAG AA contrast on white, so the light-mode default uses a darker
+    /// burnt orange. Manager-customized hexes round-trip as the literal stored
+    /// color; the manager owns that contrast tradeoff.
     var brandColor: Color {
-        Color(hex: brandColorHex) ?? Self.defaultBrandColor
+        if brandColorHex == Self.defaultBrandColorHex {
+            return Self.defaultBrandColor
+        }
+        return Color(hex: brandColorHex) ?? Self.defaultBrandColor
     }
 
     /// PDF renderer consumes a `UIColor` because `UIGraphicsPDFRenderer`'s
     /// `NSAttributedString.Key.foregroundColor` wants `UIColor`, not `Color`.
+    /// Same default-sentinel adaptation as `brandColor`. PDF rendering pins a
+    /// light trait collection in `FormRenderer.render`, so the dynamic default
+    /// resolves to its light-mode (darker) variant on the white page
+    /// regardless of the app's current appearance.
     var brandUIColor: UIColor {
-        UIColor(hex: brandColorHex) ?? Self.defaultBrandUIColor
+        if brandColorHex == Self.defaultBrandColorHex {
+            return Self.defaultBrandUIColor
+        }
+        return UIColor(hex: brandColorHex) ?? Self.defaultBrandUIColor
     }
 
     /// Wipes the saved color back to the iOS system orange default.
@@ -203,12 +217,38 @@ final class AppSettings {
     /// init time to drive a one-shot migration to on-disk file storage.
     /// Not written to going forward.
     private static let legacyCompanyLogoKey = "companyLogoData"
-    /// Matches `UIColor.systemOrange` resolved against a light trait collection
-    /// (the way it'll render in the PDF). SwiftUI's `Color.orange` resolves to
-    /// the same RGB so the in-app surface matches the PDF output.
+    /// Sentinel hex marking "the manager has not customized the brand color".
+    /// Stored as `#FF9500` (Apple's bright systemOrange) for backward
+    /// compatibility with prior installs and so ColorPicker round-trips to a
+    /// recognizable swatch. Rendering special-cases this value in
+    /// `brandColor` / `brandUIColor` and returns the adaptive default instead
+    /// — see `defaultBrandUIColor`.
     private static let defaultBrandColorHex = "#FF9500"
-    nonisolated static let defaultBrandColor: Color = .orange
-    nonisolated static let defaultBrandUIColor: UIColor = .systemOrange
+
+    /// Adaptive default brand color. Light mode resolves to a darker burnt
+    /// orange (`#C93400`, 4.6:1 contrast on white — passes WCAG AA); dark
+    /// mode resolves to bright Apple-orange (`#FF9500`, ~10:1 contrast on
+    /// black). Built as a dynamic `UIColor` so SwiftUI consumers
+    /// (`foregroundStyle`, `tint`) and UIKit consumers (PDF text rendering)
+    /// both pick the right variant for the surface they're drawing on.
+    ///
+    /// Only the default adapts. If a manager picks a custom hex via
+    /// `SettingsView`, the literal stored color is rendered as-is — they
+    /// own that contrast call.
+    nonisolated static let defaultBrandUIColor: UIColor = UIColor { traits in
+        switch traits.userInterfaceStyle {
+        case .dark:
+            return UIColor(red: 1.0, green: 0.584, blue: 0.0, alpha: 1.0)   // #FF9500
+        default:
+            return UIColor(red: 0.788, green: 0.204, blue: 0.0, alpha: 1.0) // #C93400
+        }
+    }
+
+    /// SwiftUI mirror of `defaultBrandUIColor`. `Color(uiColor:)` preserves
+    /// the dynamic resolution — SwiftUI re-resolves the wrapped UIColor
+    /// against the consuming view's environment, so the light/dark variant
+    /// auto-switches without an explicit `@Environment(\.colorScheme)` read.
+    nonisolated static let defaultBrandColor: Color = Color(uiColor: defaultBrandUIColor)
 }
 
 // MARK: - Hex helpers
