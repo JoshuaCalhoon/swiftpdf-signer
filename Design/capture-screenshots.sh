@@ -91,6 +91,13 @@ usage() {
 # Look up a sim UUID by device name + runtime. If the device isn't yet
 # provisioned, create it via `simctl create`. Errors with a useful message
 # if the underlying runtime isn't installed (Xcode → Settings → Components).
+#
+# Uses `grep -F` (fixed-string match) because device names like
+# "iPad Pro 13-inch (M4)" contain literal parens that would otherwise
+# get treated as regex grouping operators by awk/grep — causing the lookup
+# to silently miss the existing simulator and fall through to the
+# auto-create branch (which is how this script accumulated 3 duplicate
+# iPad sims before the bug was caught).
 resolve_udid() {
     local short="$1"
     local name runtime type_id udid
@@ -98,10 +105,16 @@ resolve_udid() {
     runtime="$(device_runtime_for "$short")"
     type_id="$(device_type_id_for "$short")"
 
+    # Find the FIRST line listing this device name followed by " (" (the
+    # opener for the UDID parens), then extract the UUID-shaped substring.
+    # `grep -F` keeps the parens in the name literal; `grep -oE` matches
+    # the canonical 8-4-4-4-12 hex UUID and ignores the trailing "(state)"
+    # parens.
     udid="$(xcrun simctl list devices "$runtime" 2>/dev/null \
-        | awk -F '[()]' -v name="$name" '
-            $0 ~ ("^[[:space:]]*" name " \\(") { print $2; exit }
-          ')"
+        | grep -F "    $name (" \
+        | head -1 \
+        | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
+        | head -1)"
 
     if [[ -n "$udid" ]]; then
         printf '%s' "$udid"
