@@ -7,7 +7,7 @@
 # Design/listing-screenshots/{device}/{name}.png.
 #
 # Usage:
-#   ./Design/capture-screenshots.sh boot iphone-6.9      # boot + pin status
+#   ./Design/capture-screenshots.sh boot iphone-6.5      # boot + pin status
 #   ./Design/capture-screenshots.sh boot ipad-13         # boot + pin status
 #   ./Design/capture-screenshots.sh appearance dark      # active sim → dark
 #   ./Design/capture-screenshots.sh appearance light     # active sim → light
@@ -16,16 +16,22 @@
 #   ./Design/capture-screenshots.sh done                 # restore status bar
 #
 # Workflow:
-#   1. boot iphone-6.9  → simulator launches, status bar pinned
+#   1. boot iphone-6.5  → simulator launches, status bar pinned (auto-creates
+#                          the sim if it isn't provisioned yet)
 #   2. Open SwiftPDF in Xcode, target this simulator, hit Run
 #   3. Drive the UI by hand; between captures, run `shot <name>`
 #   4. appearance dark → re-capture key screens
 #   5. boot ipad-13 → repeat 2–4 for iPad shots
 #   6. done → status bar overrides cleared on every booted sim
 #
-# Required device sizes (Apple App Store, as of 2026-05):
-#   iphone-6.9 (iPhone 16 Pro Max, 1320×2868)  — REQUIRED for iPhone listings
-#   ipad-13    (iPad Pro 13" M4,   2064×2752)  — REQUIRED for iPad listings
+# Required device sizes (Apple App Store Connect, as of 2026-05):
+#   iphone-6.5 (iPhone 11 Pro Max,  1242×2688)  — REQUIRED for iPhone listings
+#   ipad-13    (iPad Pro 13" M4,    2064×2752)  — REQUIRED for iPad listings
+#
+# Per-device runtime: the iPhone uses the latest iOS runtime installed
+# (currently iOS 26.4 — better simulator perf, newer render parity); the
+# iPad is pinned to iOS 18.6 to match the physical iPad's OS version, so
+# the listing screenshots match what real users see.
 #
 # Output filenames:
 #   01-library.png      02-form.png     03-signature.png ...
@@ -38,37 +44,80 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_BASE="$REPO_ROOT/Design/listing-screenshots"
 STATE_FILE="${TMPDIR:-/tmp}/swiftpdf-screenshot-session"
-RUNTIME="iOS 18.6"
 
-# Short-name → simulator device name. Add new entries to `device_name_for`
-# below if Apple's required device list changes. (Using a function instead
-# of an associative array because macOS ships bash 3.2 — no `declare -A`.)
+# Short-name → (simulator device name, runtime, SimDeviceType ID for auto-create).
+# Add new entries to all three functions if Apple's required device list
+# changes. (Three functions instead of an associative array because macOS
+# ships bash 3.2 — no `declare -A`.)
 device_name_for() {
     case "$1" in
-        iphone-6.9) printf 'iPhone 16 Pro Max' ;;
+        iphone-6.5) printf 'iPhone 11 Pro Max' ;;
         ipad-13)    printf 'iPad Pro 13-inch (M4)' ;;
         *)          return 1 ;;
     esac
 }
 
-KNOWN_SHORTS="iphone-6.9 ipad-13"
+device_runtime_for() {
+    case "$1" in
+        iphone-6.5) printf 'iOS 26.4' ;;
+        ipad-13)    printf 'iOS 18.6' ;;
+        *)          return 1 ;;
+    esac
+}
+
+device_type_id_for() {
+    case "$1" in
+        iphone-6.5) printf 'com.apple.CoreSimulator.SimDeviceType.iPhone-11-Pro-Max' ;;
+        ipad-13)    printf 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M4-8GB' ;;
+        *)          return 1 ;;
+    esac
+}
+
+runtime_id_for() {
+    # iOS 26.4 → com.apple.CoreSimulator.SimRuntime.iOS-26-4
+    local rt="$1"
+    local suffix
+    suffix="$(printf '%s' "$rt" | sed 's/^iOS //; s/\./-/g')"
+    printf 'com.apple.CoreSimulator.SimRuntime.iOS-%s' "$suffix"
+}
+
+KNOWN_SHORTS="iphone-6.5 ipad-13"
 
 usage() {
     sed -n 's/^# \{0,1\}//; 3,30p' "$0"
     exit 1
 }
 
-# Look up a sim UUID by device name + runtime. Errors with a useful message
-# if the named device isn't installed.
+# Look up a sim UUID by device name + runtime. If the device isn't yet
+# provisioned, create it via `simctl create`. Errors with a useful message
+# if the underlying runtime isn't installed (Xcode → Settings → Components).
 resolve_udid() {
-    local name="$1"
-    local udid
-    udid="$(xcrun simctl list devices "$RUNTIME" 2>/dev/null \
+    local short="$1"
+    local name runtime type_id udid
+    name="$(device_name_for "$short")"
+    runtime="$(device_runtime_for "$short")"
+    type_id="$(device_type_id_for "$short")"
+
+    udid="$(xcrun simctl list devices "$runtime" 2>/dev/null \
         | awk -F '[()]' -v name="$name" '
             $0 ~ ("^[[:space:]]*" name " \\(") { print $2; exit }
           ')"
-    if [[ -z "$udid" ]]; then
-        echo "error: no '$name' on '$RUNTIME' — install via Xcode → Settings → Components" >&2
+
+    if [[ -n "$udid" ]]; then
+        printf '%s' "$udid"
+        return 0
+    fi
+
+    # Not provisioned — auto-create. Requires the runtime itself to be
+    # installed; if not, surface a clear error.
+    if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^$runtime "; then
+        echo "error: '$runtime' runtime not installed — Xcode → Settings → Components" >&2
+        exit 1
+    fi
+    echo "Creating '$name' on $runtime..." >&2
+    udid="$(xcrun simctl create "$name" "$type_id" "$(runtime_id_for "$runtime")" 2>&1)"
+    if [[ -z "$udid" || ! "$udid" =~ ^[A-F0-9-]+$ ]]; then
+        echo "error: simctl create failed: $udid" >&2
         exit 1
     fi
     printf '%s' "$udid"
@@ -97,7 +146,7 @@ boot_device() {
         exit 1
     fi
     local udid
-    udid="$(resolve_udid "$name")"
+    udid="$(resolve_udid "$short")"
 
     if ! xcrun simctl list devices | grep -q "$udid.*Booted"; then
         echo "Booting $name ($udid)..."
