@@ -10,6 +10,14 @@ final class DropboxService {
         case authorizing
         case authorized
         case authFailed(message: String)
+        /// In-memory preview session that bypasses Dropbox entirely. Entered
+        /// from the Connect screen via "Try Demo" so an App Store reviewer
+        /// (or any first-time visitor) can exercise the full sign / save UX
+        /// without an account. No Dropbox CRUD method may be called in this
+        /// state — `TemplateStore` and `FormView` branch on the state to stay
+        /// in-memory; the CRUD methods here throw `ServiceError.demoMode`
+        /// defensively if reached.
+        case demo
     }
 
     private(set) var authState: AuthState = .notAuthorized
@@ -100,6 +108,37 @@ final class DropboxService {
         ManagerGate.markFirstSetupComplete()
     }
 
+    /// Enters the no-Dropbox preview state. Only valid from a non-active
+    /// session (`.notAuthorized` or `.authFailed`) — refuses to clobber an
+    /// in-flight authorize or an already-authorized session. Sets
+    /// `ManagerGate.demoBypass` so subsequent biometric prompts on
+    /// Settings/Manage auto-pass for the reviewer.
+    ///
+    /// Intentionally does NOT call `markFirstSetupComplete()` — entering demo
+    /// doesn't count as setup, so if the user later taps Connect Dropbox the
+    /// first-install bypass on the Connect button still applies.
+    func beginDemoSession() {
+        switch authState {
+        case .notAuthorized, .authFailed:
+            authState = .demo
+            ManagerGate.demoBypass = true
+        case .authorizing, .authorized, .demo:
+            // Either an OAuth flow is in flight, we already have a real
+            // session, or we're already in demo. Nothing to do.
+            break
+        }
+    }
+
+    /// Leaves the demo preview and returns to `.notAuthorized` so
+    /// `ContentView` routes back to the Connect screen. Clears the
+    /// ManagerGate demo bypass at the same time so future prompts behave
+    /// normally.
+    func endDemoSession() {
+        guard authState == .demo else { return }
+        ManagerGate.demoBypass = false
+        authState = .notAuthorized
+    }
+
     /// Routes a ManagerGate failure into the same `authFailed` UI as Dropbox
     /// SDK errors. Used by `ConnectDropboxView` when the gate rejects a
     /// Connect attempt (cancelled biometric prompt, missing passcode).
@@ -111,6 +150,7 @@ final class DropboxService {
     /// Token-revoked / refresh-failure errors are surfaced as `ServiceError.notAuthorized`
     /// after clearing the local client — `ContentView` will then route back to `ConnectDropboxView`.
     func upload(_ pdfData: Data, filename: String) async throws -> String {
+        if authState == .demo { throw ServiceError.demoMode }
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
@@ -132,6 +172,7 @@ final class DropboxService {
     /// Lists `.json` files in the Templates folder. Treats "folder not found" as
     /// an empty list — the folder gets created automatically on first upload.
     func listTemplates() async throws -> [TemplateRef] {
+        if authState == .demo { throw ServiceError.demoMode }
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
@@ -161,6 +202,7 @@ final class DropboxService {
 
     /// Downloads the raw JSON bytes for one template.
     func downloadTemplate(at path: String) async throws -> Data {
+        if authState == .demo { throw ServiceError.demoMode }
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
@@ -183,6 +225,7 @@ final class DropboxService {
     /// than creating "template (1).json" siblings.
     @discardableResult
     func saveTemplate(_ data: Data, filename: String) async throws -> String {
+        if authState == .demo { throw ServiceError.demoMode }
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
@@ -203,6 +246,7 @@ final class DropboxService {
 
     /// Permanently deletes one template file from Dropbox.
     func deleteTemplate(at path: String) async throws {
+        if authState == .demo { throw ServiceError.demoMode }
         guard let client = DropboxClientsManager.authorizedClient else {
             throw ServiceError.notAuthorized
         }
@@ -272,6 +316,13 @@ final class DropboxService {
 
     enum ServiceError: LocalizedError {
         case notAuthorized
+        /// Defensive guard: a Dropbox CRUD method was reached while
+        /// `authState == .demo`. Indicates a missing demo-branch in a
+        /// caller (TemplateStore / FormView) — should never surface to the
+        /// user in shipped code. Distinct from `.notAuthorized` so the
+        /// failure banner doesn't lure the reviewer to "connect Dropbox"
+        /// to fix what is actually a code bug.
+        case demoMode
         /// A URLSession failure surfaced through `DropboxService` — usually
         /// offline, network lost, DNS unreachable, or timed-out. The wrapped
         /// `URLError.Code` lets the caller distinguish if needed, but the
@@ -282,6 +333,8 @@ final class DropboxService {
             switch self {
             case .notAuthorized:
                 return "Dropbox is not connected"
+            case .demoMode:
+                return "Demo mode: Dropbox actions are disabled. Connect Dropbox to enable uploads."
             case .networkUnreachable(let code):
                 switch code {
                 case .notConnectedToInternet:

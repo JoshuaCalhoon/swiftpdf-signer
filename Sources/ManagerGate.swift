@@ -34,6 +34,14 @@ enum ManagerGate {
 
     private static var lastAuthenticatedAt: Date?
 
+    /// When true, every `require(...)` call returns `.authenticated` without
+    /// prompting. Flipped on by `DropboxService.beginDemoSession()` and off
+    /// by `endDemoSession()` so an App Store reviewer (or any demo-mode user)
+    /// can reach Settings / Manage / Disconnect without owning the device's
+    /// Face ID enrollment. Demo sessions don't have any real-data surface
+    /// area worth gating, so this is safe.
+    static var demoBypass = false
+
     /// Runs the biometric / passcode prompt and reports the outcome. `reason`
     /// becomes the subtitle of the system prompt — keep it short and concrete:
     /// "Return to template library", "Disconnect Dropbox", etc.
@@ -42,6 +50,9 @@ enum ManagerGate {
     /// authentication is still inside the grace window. The grace is reset by
     /// `invalidate()` (called on app background and on customer-flow entry).
     static func require(reason: String) async -> Outcome {
+        if demoBypass {
+            return .authenticated
+        }
         if let last = lastAuthenticatedAt,
            Date().timeIntervalSince(last) < graceWindow {
             return .authenticated

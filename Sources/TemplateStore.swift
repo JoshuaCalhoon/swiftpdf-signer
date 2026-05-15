@@ -18,6 +18,11 @@ final class TemplateStore {
     /// left guessing about a quietly-shorter list. Reset to zero at the top
     /// of each `refresh()`.
     private(set) var lastRefreshSkipCount: Int = 0
+    /// True once the in-memory demo library has been seeded with the sample.
+    /// Guards `refresh()` against re-seeding on every pull-to-refresh — without
+    /// this flag a reviewer who deletes the sample, then pulls down to
+    /// refresh, would see it reappear with a fresh UUID.
+    private var hasSeededDemo = false
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "swiftpdf",
@@ -50,6 +55,20 @@ final class TemplateStore {
     /// `hasSeededSample` flag is local to the device, so a second iPad
     /// joining an existing account won't re-seed.
     func refresh() async {
+        // Demo session never touches Dropbox. First refresh seeds the
+        // sample template; subsequent refreshes leave the in-memory list
+        // alone so a reviewer's edits / deletes / new templates persist
+        // across pull-to-refresh.
+        if dropbox.authState == .demo {
+            if !hasSeededDemo {
+                templates = [FormTemplate.makeFreshSample()]
+                hasSeededDemo = true
+            }
+            lastRefreshSkipCount = 0
+            loadState = .loaded
+            return
+        }
+
         loadState = .loading
         var skipped = 0
         do {
@@ -137,6 +156,15 @@ final class TemplateStore {
         guard template.editable else {
             throw StoreError.notEditable
         }
+        // Demo session: in-memory write only, no Dropbox round-trip.
+        if dropbox.authState == .demo {
+            var updated = templates.filter { $0.id != template.id }
+            updated.append(template)
+            templates = updated.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            return
+        }
         let data = try Self.makeEncoder().encode(template)
         _ = try await dropbox.saveTemplate(data, filename: Self.filename(for: template))
         var updated = templates.filter { $0.id != template.id }
@@ -152,6 +180,11 @@ final class TemplateStore {
     /// content).
     func delete(_ template: FormTemplate) async throws {
         guard template.editable else { return }
+        // Demo session: in-memory delete only, no Dropbox round-trip.
+        if dropbox.authState == .demo {
+            templates.removeAll { $0.id == template.id }
+            return
+        }
         let path = "\(DropboxConfig.templatesFolder)/\(Self.filename(for: template))"
         try await dropbox.deleteTemplate(at: path)
         templates.removeAll { $0.id == template.id }
@@ -164,6 +197,17 @@ final class TemplateStore {
     /// library empty because the flag thinks we've already seeded once.
     func resetSeedFlag() {
         defaults.removeObject(forKey: Self.hasSeededSampleKey)
+    }
+
+    /// Drops the in-memory demo library so the next refresh — which will be
+    /// against real Dropbox by the time it runs — starts from a clean slate
+    /// instead of inheriting the reviewer's sample edits. Called by
+    /// LibraryView when leaving demo to connect a real account.
+    func resetForDemoExit() {
+        templates = []
+        loadState = .idle
+        hasSeededDemo = false
+        lastRefreshSkipCount = 0
     }
 
     enum StoreError: LocalizedError {

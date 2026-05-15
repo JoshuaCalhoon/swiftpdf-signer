@@ -7,7 +7,10 @@ struct ContentView: View {
         switch dropbox.authState {
         case .notAuthorized, .authorizing, .authFailed:
             ConnectDropboxView()
-        case .authorized:
+        case .authorized, .demo:
+            // Demo session routes to the same Library surface as a real
+            // Dropbox session. TemplateStore and FormView branch internally
+            // on `dropbox.authState == .demo` so calls stay in-memory.
             NavigationStack {
                 LibraryView()
             }

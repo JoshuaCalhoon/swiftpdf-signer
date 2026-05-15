@@ -36,14 +36,30 @@ struct ConnectDropboxView: View {
 
             Spacer()
 
-            Button(action: startAuth) {
-                Text("Connect Dropbox")
-                    .frame(maxWidth: 360)
+            VStack(spacing: 12) {
+                Button(action: startAuth) {
+                    Text("Connect Dropbox")
+                        .frame(maxWidth: 360)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(settings.brandColor)
+                .controlSize(.large)
+                .disabled(dropbox.authState == .authorizing)
+
+                // Secondary CTA — visually subordinate to Connect so a real
+                // user reads "sign in" as the default path. Reviewers (and
+                // anyone who wants to look around before authorizing) get a
+                // no-account way into the app. Demo state is purely
+                // in-memory — see DropboxService.beginDemoSession.
+                Button(action: dropbox.beginDemoSession) {
+                    Text("Try Demo (no sign-in required)")
+                        .frame(maxWidth: 360)
+                }
+                .buttonStyle(.bordered)
+                .tint(settings.brandColor)
+                .controlSize(.large)
+                .disabled(dropbox.authState == .authorizing)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(settings.brandColor)
-            .controlSize(.large)
-            .disabled(dropbox.authState == .authorizing)
             .padding(.bottom, 40)
         }
         .padding()

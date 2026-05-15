@@ -5,6 +5,7 @@ struct FormView: View {
     let template: FormTemplate
 
     @Environment(DropboxService.self) private var dropbox
+    @Environment(TemplateStore.self) private var store
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var printName = ""
@@ -21,6 +22,12 @@ struct FormView: View {
         /// `…(1).pdf`). The success panel surfaces this so the manager knows
         /// to check for a sibling file before filing.
         case success(path: String, autorenamedFrom: String?)
+        /// Demo signing succeeded. The PDF was rendered locally (so any
+        /// signature / renderer failure still surfaces as `.failure`) but
+        /// nothing was uploaded. `filename` is the same deterministic name
+        /// production would have used, surfaced so the reviewer can confirm
+        /// the `{Form} - {Signer} [{Date}].pdf` convention.
+        case demoSuccess(filename: String)
         case failure(message: String)
     }
 
@@ -51,6 +58,11 @@ struct FormView: View {
                     .disabled(isUploading)
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if dropbox.authState == .demo {
+                DemoBanner(onConnect: exitDemo)
+            }
+        }
         .alert("Couldn't return to library", isPresented: Binding(
             get: { gateError != nil },
             set: { if !$0 { gateError = nil } }
@@ -65,6 +77,16 @@ struct FormView: View {
         // so a curious customer can't ride the manager's grace window to tap
         // Exit and reach the library.
         .onAppear { ManagerGate.invalidate() }
+    }
+
+    /// Demo → Connect transition from the persistent banner. Mirrors the
+    /// same handler in LibraryView — endDemoSession flips ContentView to
+    /// the Connect screen, and resetForDemoExit ensures a future demo
+    /// re-entry re-seeds the sample instead of inheriting this session's
+    /// edits.
+    private func exitDemo() {
+        dropbox.endDemoSession()
+        store.resetForDemoExit()
     }
 
     /// Returns to the Library after a manager re-authenticates. Customer
@@ -95,19 +117,60 @@ struct FormView: View {
     }
 
     private var isSuccessShowing: Bool {
-        if case .success = status { return true }
-        return false
+        switch status {
+        case .success, .demoSuccess: return true
+        case .idle, .failure: return false
+        }
     }
 
     @ViewBuilder
     private var bottomPanel: some View {
-        if case .success(let path, let renamedFrom) = status {
+        switch status {
+        case .success(let path, let renamedFrom):
             successPanel(path: path, autorenamedFrom: renamedFrom)
                 .transition(.opacity)
-        } else {
+        case .demoSuccess(let filename):
+            demoSuccessPanel(filename: filename)
+                .transition(.opacity)
+        case .idle, .failure:
             signingPanel
                 .transition(.opacity)
         }
+    }
+
+    /// Demo counterpart to `successPanel`. Renders the same checkmark hero
+    /// and filename so the reviewer sees the deterministic naming format,
+    /// but replaces the Dropbox path with a "demo — not uploaded" notice and
+    /// drops the autorename warning (which can't apply locally).
+    private func demoSuccessPanel(filename: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(settings.brandColor)
+            Text("Signed (Demo)")
+                .font(.title2.bold())
+            Text(filename)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Label("Demo mode: nothing was uploaded. Connect Dropbox to enable real uploads.", systemImage: "info.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Button(action: signAnother) {
+                Text("Sign Another")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(settings.brandColor)
+            .controlSize(.large)
+            .padding(.top, 4)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
     }
 
     private func successPanel(path: String, autorenamedFrom: String?) -> some View {
@@ -242,6 +305,29 @@ struct FormView: View {
         guard !isUploading else { return }
         isUploading = true
         defer { isUploading = false }
+
+        // Demo session: render the PDF (so signature / renderer issues still
+        // surface as `.failure`) but skip the Dropbox upload entirely. No
+        // `pendingUpload` cache needed — there's no upload to retry.
+        if dropbox.authState == .demo {
+            let renderer = FormRenderer(
+                brandColor: settings.brandUIColor,
+                companyLogo: settings.companyLogo
+            )
+            let now = Date()
+            do {
+                _ = try renderer.render(
+                    template: template,
+                    printName: printName,
+                    signature: signature,
+                    signedAt: now
+                )
+                status = .demoSuccess(filename: makeFilename(for: printName, on: now))
+            } catch {
+                status = .failure(message: error.localizedDescription)
+            }
+            return
+        }
 
         let upload: PendingUpload
         if let existing = pendingUpload {

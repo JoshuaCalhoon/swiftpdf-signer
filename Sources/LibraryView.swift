@@ -15,6 +15,10 @@ struct LibraryView: View {
     @State private var gateError: String?
     @State private var inFlightActions: Set<UUID> = []
 
+    private var isDemo: Bool {
+        dropbox.authState == .demo
+    }
+
     var body: some View {
         listView
             .listStyle(.insetGrouped)
@@ -23,6 +27,11 @@ struct LibraryView: View {
                 FormView(template: template)
             }
             .toolbar { toolbarMenu }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if isDemo {
+                    DemoBanner(onConnect: exitDemo)
+                }
+            }
             .sheet(isPresented: $showNewTemplate) {
                 TemplateEditorView(template: nil)
             }
@@ -52,6 +61,16 @@ struct LibraryView: View {
             ))
             .task { await store.refresh() }
             .refreshable { await store.refresh() }
+    }
+
+    /// Demo → Connect transition. No confirmation dialog (the demo has no
+    /// real data to lose) and no ManagerGate prompt (the bypass is already
+    /// active; even without it, demo carries no manager-only state). The
+    /// state flip routes ContentView back to ConnectDropboxView, where the
+    /// user takes the real OAuth path.
+    private func exitDemo() {
+        dropbox.endDemoSession()
+        store.resetForDemoExit()
     }
 
     private var listView: some View {
@@ -131,10 +150,20 @@ struct LibraryView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button(role: .destructive) {
-                    Task { await tryDisconnect() }
-                } label: {
-                    Label("Disconnect Dropbox", systemImage: "rectangle.portrait.and.arrow.right")
+                if isDemo {
+                    // Demo has nothing to lose — non-destructive item, no
+                    // confirmation dialog, no ManagerGate. Tapping ends the
+                    // demo session and ContentView routes back to the
+                    // ConnectDropboxView where the real OAuth path lives.
+                    Button(action: exitDemo) {
+                        Label("Connect Dropbox", systemImage: "rectangle.portrait.and.arrow.forward")
+                    }
+                } else {
+                    Button(role: .destructive) {
+                        Task { await tryDisconnect() }
+                    } label: {
+                        Label("Disconnect Dropbox", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
