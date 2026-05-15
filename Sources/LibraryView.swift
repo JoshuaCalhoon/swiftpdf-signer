@@ -23,6 +23,12 @@ struct LibraryView: View {
         listView
             .listStyle(.insetGrouped)
             .navigationTitle("SwiftPDF Signer")
+            // Collapse the large-title area in demo so the persistent banner
+            // sits directly under the toolbar — without this, NavigationStack
+            // reserves ~90pt of empty space above the banner for the large
+            // title, even though the safeAreaInset has already moved the
+            // banner above where the title would render.
+            .navigationBarTitleDisplayMode(isDemo ? .inline : .automatic)
             .navigationDestination(for: FormTemplate.self) { template in
                 FormView(template: template)
             }

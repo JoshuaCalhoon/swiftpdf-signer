@@ -35,7 +35,7 @@ struct DemoBanner: View {
                 .tint(settings.brandColor)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 2)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
         .overlay(alignment: .bottom) {
