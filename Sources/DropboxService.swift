@@ -73,7 +73,7 @@ final class DropboxService {
         // empty appKey (see `DropboxConfig.appKey`). Surface a clear error
         // instead of letting SwiftyDropbox produce an opaque failure.
         guard !DropboxConfig.appKey.isEmpty else {
-            authState = .authFailed(message: "App is misconfigured — Dropbox App Key is missing. Contact IT.")
+            authState = .authFailed(message: "App is misconfigured: Dropbox App Key is missing. Contact IT.")
             return
         }
         authState = .authorizing

@@ -129,12 +129,12 @@ extension FormTemplate {
                 effectiveDate: Date()
             ),
             content: .structured(
-                intro: "This is a sample template demonstrating the structured form layout. To create your own form, tap New Template — or edit this one to fit your organization.",
+                intro: "This is a sample template demonstrating the structured form layout. To create your own form, tap New Template, or edit this one to fit your organization.",
                 rules: [
-                    "Sample rule one — replace this text with content relevant to your form.",
-                    "Sample rule two — rules render as a numbered list in the signed PDF.",
-                    "Sample rule three — keep rules concise; the renderer surfaces an error if content overflows the page.",
-                    "Sample rule four — add as many rules as your form requires."
+                    "Sample rule one: replace this text with content relevant to your form.",
+                    "Sample rule two: rules render as a numbered list in the signed PDF.",
+                    "Sample rule three: keep rules concise; the renderer surfaces an error if content overflows the page.",
+                    "Sample rule four: add as many rules as your form requires."
                 ],
                 acknowledgment: "By signing below, I acknowledge that this is a sample form. Replace this template with one tailored to your organization before sharing it with signers."
             ),

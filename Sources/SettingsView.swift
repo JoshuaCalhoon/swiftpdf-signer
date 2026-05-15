@@ -149,7 +149,7 @@ struct SettingsView: View {
         } header: {
             Text("Company Logo")
         } footer: {
-            Text("Optional. Renders at the left of the header on signed PDFs and in the in-app preview. Square images look best — non-square images are letterboxed inside a square slot.")
+            Text("Optional. Renders at the left of the header on signed PDFs and in the in-app preview. Square images look best. Non-square images are letterboxed inside a square slot.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -199,7 +199,7 @@ struct SettingsView: View {
         } header: {
             Text("About")
         } footer: {
-            Text("This app's source is published at the repository above. The commit hash identifies the exact source state this build was produced from — anyone can clone, build, and verify the app's behavior. A `-dirty` suffix means the build was made from a working tree with uncommitted changes.")
+            Text("This app's source is published at the repository above. The commit hash identifies the exact source state this build was produced from. Anyone can clone, build, and verify the app's behavior. A `-dirty` suffix means the build was made from a working tree with uncommitted changes.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

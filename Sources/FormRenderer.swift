@@ -60,7 +60,7 @@ struct FormRenderer {
     ) throws -> Data {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
-            kCGPDFContextTitle as String: "\(template.name) — \(printName)",
+            kCGPDFContextTitle as String: "\(template.name) - \(printName)",
             kCGPDFContextAuthor as String: template.header.company,
             kCGPDFContextCreator as String: "SwiftPDF"
         ]

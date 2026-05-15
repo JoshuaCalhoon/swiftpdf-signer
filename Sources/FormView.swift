@@ -180,7 +180,7 @@ struct FormView: View {
                         Text("Retry Upload")
                             .frame(maxWidth: .infinity)
                     } else {
-                        Text("Done — Save & Upload")
+                        Text("Done: Save & Upload")
                             .frame(maxWidth: .infinity)
                     }
                 }
