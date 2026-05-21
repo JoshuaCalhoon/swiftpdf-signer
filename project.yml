@@ -1,0 +1,140 @@
+name: SwiftPDF
+options:
+  bundleIdPrefix: com.bar-all
+  deploymentTarget:
+    iOS: "18.6"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+configFiles:
+  Debug: Configuration/Local.xcconfig
+  Release: Configuration/Local.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6"
+    CODE_SIGN_STYLE: Automatic
+
+packages:
+  SwiftyDropbox:
+    url: https://github.com/dropbox/SwiftyDropbox.git
+    from: "10.2.4"
+
+targets:
+  "SwiftPDF Signer":
+    type: application
+    platform: iOS
+    deploymentTarget: "18.6"
+    preBuildScripts:
+      - name: Inject source commit SHA
+        basedOnDependencyAnalysis: false
+        script: |
+          # Captures the current git commit SHA at build time and writes it into
+          # the Info.plist as `SourceCommit`. The Settings → About row reads it
+          # and offers a tappable link to the public source at that commit.
+          # Production builds should be made from a fresh clone of the public
+          # repo (see SourceRepository below) so the SHA corresponds to a real,
+          # reviewable revision.
+          set -eu
+          cd "$PROJECT_DIR"
+          if SHA=$(git rev-parse HEAD 2>/dev/null); then
+            if ! git diff --quiet HEAD 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+              SHA="${SHA}-dirty"
+            fi
+          else
+            SHA="unknown"
+          fi
+          PLIST="$PROJECT_DIR/$INFOPLIST_FILE"
+          if [ -f "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Delete :SourceCommit" "$PLIST" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :SourceCommit string $SHA" "$PLIST"
+            echo "Injected SourceCommit=$SHA into $INFOPLIST_FILE"
+          else
+            echo "warning: Info.plist not found at $PLIST — SourceCommit not injected"
+          fi
+    sources:
+      - path: Sources
+    dependencies:
+      - package: SwiftyDropbox
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        SUPPORTS_MACCATALYST: "NO"
+        PRODUCT_BUNDLE_IDENTIFIER: com.bar-all.swiftpdf
+        PRODUCT_MODULE_NAME: SwiftPDF
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Disabled so the `Inject source commit SHA` preBuildScript can read
+        # the repo's git state and write SwiftPDF-Info.plist. Sandboxing here is
+        # dev-time only; it does not affect the shipped binary. No third-party
+        # SPM dependencies in this project ship build scripts that would
+        # benefit from the sandbox.
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    info:
+      path: SwiftPDF-Info.plist
+      properties:
+        CFBundleDisplayName: SwiftPDF Signer
+        CFBundleShortVersionString: "1.1.0"
+        CFBundleVersion: "5"
+        # Export compliance: the app uses only Apple-provided standard
+        # cryptography (URLSession HTTPS/TLS via SwiftyDropbox, Keychain
+        # for the Dropbox refresh token, ASWebAuthenticationSession for
+        # OAuth PKCE). No third-party crypto libraries, no proprietary
+        # algorithms, no encrypted file formats. Declaring `false` here
+        # makes App Store Connect skip the per-upload encryption
+        # questionnaire — qualifies under the standard-cryptography
+        # exemption.
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: ""
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        DropboxAppKey: $(DROPBOX_APP_KEY)
+        # Public source repository — hardcoded here, surfaced in Settings → About
+        # alongside the commit SHA captured by the `Inject source commit SHA`
+        # preBuildScript. Replace before the first push to GitHub to match the
+        # actual public repo URL.
+        SourceRepository: https://github.com/JoshuaCalhoon/swiftpdf-signer
+        NSFaceIDUsageDescription: Confirms a manager is present before any administrative action — returning to the template library, opening Settings, managing or creating templates, or connecting/disconnecting Dropbox. The customer signing on this device should never be able to trigger these actions.
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: com.bar-all.swiftpdf.dropbox
+            CFBundleURLSchemes:
+              - db-$(DROPBOX_APP_KEY)
+        LSApplicationQueriesSchemes:
+          - dbapi-2
+          - dbapi-8-emm
+
+  "SwiftPDF SignerTests":
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.6"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: "SwiftPDF Signer"
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_BUNDLE_IDENTIFIER: com.bar-all.swiftpdf.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  SwiftPDF Signer:
+    build:
+      targets:
+        "SwiftPDF Signer": all
+        "SwiftPDF SignerTests": [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - "SwiftPDF SignerTests"
+    archive:
+      config: Release

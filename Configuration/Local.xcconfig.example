@@ -1,0 +1,19 @@
+// Configuration/Local.xcconfig.example
+//
+// Copy this file to Configuration/Local.xcconfig (the real one is gitignored)
+// and fill in real values.
+//
+// DROPBOX_APP_KEY
+//   Public OAuth client identifier from https://www.dropbox.com/developers/apps.
+//   Not a cryptographic secret — PKCE prevents impersonation. Still gitignored
+//   as a defense-in-depth habit.
+//
+// DEVELOPMENT_TEAM
+//   10-character Apple Developer Team ID. Find it at
+//   https://developer.apple.com/account → Membership Details → Team ID,
+//   or in Xcode → Settings → Accounts → (your Apple ID) → Manage Certificates.
+//   Required for signing builds for a physical iPad. Simulator builds work
+//   without it. Personal (individual) and organization accounts both have one.
+
+DROPBOX_APP_KEY = REPLACE_WITH_DROPBOX_APP_KEY
+DEVELOPMENT_TEAM = REPLACE_WITH_TEAM_ID
